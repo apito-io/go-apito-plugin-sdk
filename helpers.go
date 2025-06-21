@@ -61,7 +61,288 @@ func NonNullListField(itemType, description string) GraphQLField {
 	return Field("["+itemType+"!]!", description)
 }
 
-// ObjectField creates an object type GraphQL field with properties
+// =====================================================
+// ENHANCED COMPLEX TYPE SUPPORT
+// =====================================================
+
+// ObjectTypeDefinition represents a complex object type with multiple fields
+type ObjectTypeDefinition struct {
+	TypeName    string                    `json:"typeName"`
+	Description string                    `json:"description"`
+	Fields      map[string]ObjectFieldDef `json:"fields"`
+}
+
+// ObjectFieldDef represents a field within an object type
+type ObjectFieldDef struct {
+	Type          string `json:"type"`
+	Description   string `json:"description"`
+	Nullable      bool   `json:"nullable"`
+	List          bool   `json:"list"`
+	ListOfNonNull bool   `json:"listOfNonNull"`
+}
+
+// ComplexObjectField creates a GraphQL field that returns a complex object type
+func ComplexObjectField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	return GraphQLField{
+		Type:        objectDef.TypeName,
+		Description: description,
+		Args: map[string]interface{}{
+			"objectType": map[string]interface{}{
+				"typeName":    objectDef.TypeName,
+				"description": objectDef.Description,
+				"fields":      serializeObjectFields(objectDef.Fields),
+			},
+		},
+	}
+}
+
+// ComplexObjectFieldWithArgs creates a GraphQL field with args that returns a complex object type
+func ComplexObjectFieldWithArgs(description string, objectDef ObjectTypeDefinition, args map[string]interface{}) GraphQLField {
+	field := ComplexObjectField(description, objectDef)
+
+	// Merge the arguments with the object type definition
+	for key, value := range args {
+		field.Args[key] = value
+	}
+
+	return field
+}
+
+// ListOfObjectsField creates a GraphQL field that returns a list of complex objects
+func ListOfObjectsField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	return GraphQLField{
+		Type:        "[" + objectDef.TypeName + "]",
+		Description: description,
+		Args: map[string]interface{}{
+			"objectType": map[string]interface{}{
+				"typeName":    objectDef.TypeName,
+				"description": objectDef.Description,
+				"fields":      serializeObjectFields(objectDef.Fields),
+			},
+		},
+	}
+}
+
+// ListOfObjectsFieldWithArgs creates a GraphQL field with args that returns a list of complex objects
+func ListOfObjectsFieldWithArgs(description string, objectDef ObjectTypeDefinition, args map[string]interface{}) GraphQLField {
+	field := ListOfObjectsField(description, objectDef)
+
+	// Merge the arguments with the object type definition
+	for key, value := range args {
+		field.Args[key] = value
+	}
+
+	return field
+}
+
+// NonNullListOfObjectsField creates a non-null list of objects field
+func NonNullListOfObjectsField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	return GraphQLField{
+		Type:        "[" + objectDef.TypeName + "!]!",
+		Description: description,
+		Args: map[string]interface{}{
+			"objectType": map[string]interface{}{
+				"typeName":    objectDef.TypeName,
+				"description": objectDef.Description,
+				"fields":      serializeObjectFields(objectDef.Fields),
+			},
+		},
+	}
+}
+
+// serializeObjectFields converts ObjectFieldDef map to serializable format
+func serializeObjectFields(fields map[string]ObjectFieldDef) map[string]interface{} {
+	result := make(map[string]interface{})
+	for fieldName, fieldDef := range fields {
+		result[fieldName] = map[string]interface{}{
+			"type":          fieldDef.Type,
+			"description":   fieldDef.Description,
+			"nullable":      fieldDef.Nullable,
+			"list":          fieldDef.List,
+			"listOfNonNull": fieldDef.ListOfNonNull,
+		}
+	}
+	return result
+}
+
+// =====================================================
+// OBJECT TYPE DEFINITION BUILDERS
+// =====================================================
+
+// NewObjectType creates a new object type definition
+func NewObjectType(typeName, description string) *ObjectTypeBuilder {
+	return &ObjectTypeBuilder{
+		def: ObjectTypeDefinition{
+			TypeName:    typeName,
+			Description: description,
+			Fields:      make(map[string]ObjectFieldDef),
+		},
+	}
+}
+
+// ObjectTypeBuilder helps build complex object type definitions
+type ObjectTypeBuilder struct {
+	def ObjectTypeDefinition
+}
+
+// AddStringField adds a string field to the object type
+func (b *ObjectTypeBuilder) AddStringField(name, description string, nullable bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          "String",
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddIntField adds an integer field to the object type
+func (b *ObjectTypeBuilder) AddIntField(name, description string, nullable bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          "Int",
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddBooleanField adds a boolean field to the object type
+func (b *ObjectTypeBuilder) AddBooleanField(name, description string, nullable bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          "Boolean",
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddFloatField adds a float field to the object type
+func (b *ObjectTypeBuilder) AddFloatField(name, description string, nullable bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          "Float",
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddObjectField adds a nested object field to the object type
+func (b *ObjectTypeBuilder) AddObjectField(name, description, objectType string, nullable bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          objectType,
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddListField adds an array/list field to the object type
+func (b *ObjectTypeBuilder) AddListField(name, description, itemType string, nullable, listOfNonNull bool) *ObjectTypeBuilder {
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:          itemType,
+		Description:   description,
+		Nullable:      nullable,
+		List:          true,
+		ListOfNonNull: listOfNonNull,
+	}
+	return b
+}
+
+// AddStringListField adds a list of strings field
+func (b *ObjectTypeBuilder) AddStringListField(name, description string, nullable, listOfNonNull bool) *ObjectTypeBuilder {
+	return b.AddListField(name, description, "String", nullable, listOfNonNull)
+}
+
+// AddIntListField adds a list of integers field
+func (b *ObjectTypeBuilder) AddIntListField(name, description string, nullable, listOfNonNull bool) *ObjectTypeBuilder {
+	return b.AddListField(name, description, "Int", nullable, listOfNonNull)
+}
+
+// AddObjectListField adds a list of objects field
+func (b *ObjectTypeBuilder) AddObjectListField(name, description, objectType string, nullable, listOfNonNull bool) *ObjectTypeBuilder {
+	return b.AddListField(name, description, objectType, nullable, listOfNonNull)
+}
+
+// Build returns the completed object type definition
+func (b *ObjectTypeBuilder) Build() ObjectTypeDefinition {
+	return b.def
+}
+
+// =====================================================
+// COMMON COMPLEX TYPE DEFINITIONS
+// =====================================================
+
+// UserObjectType creates a standard User object type
+func UserObjectType() ObjectTypeDefinition {
+	return NewObjectType("User", "A user in the system").
+		AddStringField("id", "User ID", false).
+		AddStringField("name", "User's full name", true).
+		AddStringField("email", "User's email address", true).
+		AddStringField("username", "User's username", true).
+		AddBooleanField("active", "Whether the user is active", false).
+		AddStringField("createdAt", "When the user was created", true).
+		AddStringField("updatedAt", "When the user was last updated", true).
+		Build()
+}
+
+// PaginationInfoType creates a standard pagination info object type
+func PaginationInfoType() ObjectTypeDefinition {
+	return NewObjectType("PaginationInfo", "Information about pagination").
+		AddIntField("total", "Total number of items", false).
+		AddIntField("limit", "Number of items per page", false).
+		AddIntField("offset", "Current offset", false).
+		AddIntField("page", "Current page number", false).
+		AddIntField("totalPages", "Total number of pages", false).
+		AddBooleanField("hasNext", "Whether there is a next page", false).
+		AddBooleanField("hasPrevious", "Whether there is a previous page", false).
+		Build()
+}
+
+// ErrorObjectType creates a standard error object type
+func ErrorObjectType() ObjectTypeDefinition {
+	return NewObjectType("Error", "An error object").
+		AddStringField("code", "Error code", false).
+		AddStringField("message", "Error message", false).
+		AddStringField("field", "Field that caused the error", true).
+		AddStringListField("details", "Additional error details", true, false).
+		Build()
+}
+
+// ResponseWrapperType creates a generic response wrapper type
+func ResponseWrapperType(dataType string) ObjectTypeDefinition {
+	return NewObjectType("Response", "A generic response wrapper").
+		AddBooleanField("success", "Whether the operation was successful", false).
+		AddStringField("message", "Response message", true).
+		AddObjectField("data", "The response data", dataType, true).
+		AddObjectListField("errors", "List of errors if any", "Error", true, false).
+		Build()
+}
+
+// PaginatedResponseType creates a paginated response type
+func PaginatedResponseType(itemType string) ObjectTypeDefinition {
+	return NewObjectType("PaginatedResponse", "A paginated response").
+		AddObjectListField("items", "List of items", itemType, false, false).
+		AddObjectField("pagination", "Pagination information", "PaginationInfo", false).
+		AddBooleanField("success", "Whether the operation was successful", false).
+		AddStringField("message", "Response message", true).
+		Build()
+}
+
+// =====================================================
+// BACKWARD COMPATIBILITY - OLD OBJECTFIELD
+// =====================================================
+
+// ObjectField creates an object type GraphQL field with properties (legacy)
+// Deprecated: Use ComplexObjectField instead for better type safety
 func ObjectField(description string, properties map[string]interface{}) GraphQLField {
 	field := Field("Object", description)
 	field.Args = map[string]interface{}{
