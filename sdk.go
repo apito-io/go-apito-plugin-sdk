@@ -13,6 +13,9 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// Global plugin instance for resolver access
+var currentPlugin *Plugin
+
 // ResolverFunc is the function signature for GraphQL resolvers
 type ResolverFunc func(ctx context.Context, args map[string]interface{}) (interface{}, error)
 
@@ -76,6 +79,9 @@ func Init(name, version, apiKey string) *Plugin {
 	}
 
 	p.impl = &pluginImpl{plugin: p}
+	
+	// Set the global plugin instance for resolver access
+	currentPlugin = p
 
 	log.Printf("Plugin SDK: Initialized plugin '%s' version %s", name, version)
 	return p
@@ -152,6 +158,18 @@ func (p *Plugin) RegisterFunctions(functions map[string]FunctionHandlerFunc) {
 	}
 }
 
+// GetQueryField returns the field definition for a query
+func (p *Plugin) GetQueryField(name string) (GraphQLField, bool) {
+	field, exists := p.queries[name]
+	return field, exists
+}
+
+// GetMutationField returns the field definition for a mutation
+func (p *Plugin) GetMutationField(name string) (GraphQLField, bool) {
+	field, exists := p.mutations[name]
+	return field, exists
+}
+
 // Serve starts the plugin server
 func (p *Plugin) Serve() {
 	log.Printf("Plugin SDK: Starting plugin '%s' server...", p.name)
@@ -221,23 +239,13 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	// Convert queries to protobuf struct
 	queriesMap := make(map[string]interface{})
 	for name, field := range impl.plugin.queries {
-		queriesMap[name] = map[string]interface{}{
-			"type":        field.Type,
-			"description": field.Description,
-			"args":        field.Args,
-			"resolve":     field.Resolve,
-		}
+		queriesMap[name] = impl.serializeGraphQLField(field)
 	}
 
 	// Convert mutations to protobuf struct
 	mutationsMap := make(map[string]interface{})
 	for name, field := range impl.plugin.mutations {
-		mutationsMap[name] = map[string]interface{}{
-			"type":        field.Type,
-			"description": field.Description,
-			"args":        field.Args,
-			"resolve":     field.Resolve,
-		}
+		mutationsMap[name] = impl.serializeGraphQLField(field)
 	}
 
 	queriesStruct, err := structpb.NewStruct(queriesMap)
@@ -259,6 +267,62 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	return &protobuff.SchemaRegisterResponse{
 		Schema: schema,
 	}, nil
+}
+
+// serializeGraphQLField converts a GraphQLField to a protobuf-compatible map
+func (impl *pluginImpl) serializeGraphQLField(field GraphQLField) map[string]interface{} {
+	result := map[string]interface{}{
+		"type":        field.Type,
+		"description": field.Description,
+		"resolve":     field.Resolve,
+	}
+
+	// Serialize arguments if they exist
+	if len(field.Args) > 0 {
+		result["args"] = impl.serializeArgs(field.Args)
+	}
+
+	return result
+}
+
+// serializeArgs recursively serializes argument structures for protobuf compatibility
+func (impl *pluginImpl) serializeArgs(args map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	for key, value := range args {
+		result[key] = impl.serializeValue(value)
+	}
+
+	return result
+}
+
+// serializeValue recursively serializes any value to be protobuf-compatible
+func (impl *pluginImpl) serializeValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		// Recursively serialize nested maps
+		result := make(map[string]interface{})
+		for key, val := range v {
+			result[key] = impl.serializeValue(val)
+		}
+		return result
+
+	case []interface{}:
+		// Recursively serialize arrays
+		result := make([]interface{}, len(v))
+		for i, val := range v {
+			result[i] = impl.serializeValue(val)
+		}
+		return result
+
+	case GraphQLField:
+		// Convert GraphQLField to map
+		return impl.serializeGraphQLField(v)
+
+	default:
+		// Return primitive types as-is (string, int, bool, float, etc.)
+		return value
+	}
 }
 
 func (impl *pluginImpl) RESTApiRegister(ctx context.Context, req *protobuff.RESTApiRegisterRequest) (*protobuff.RESTApiRegisterResponse, error) {
