@@ -11,7 +11,7 @@ import (
 // Field creates a basic GraphQL field
 func Field(fieldType, description string) GraphQLField {
 	return GraphQLField{
-		Type:        fieldType,
+		Type:        createScalarType(fieldType),
 		Description: description,
 		Args:        make(map[string]interface{}),
 	}
@@ -20,7 +20,7 @@ func Field(fieldType, description string) GraphQLField {
 // FieldWithArgs creates a GraphQL field with arguments
 func FieldWithArgs(fieldType, description string, args map[string]interface{}) GraphQLField {
 	return GraphQLField{
-		Type:        fieldType,
+		Type:        createScalarType(fieldType),
 		Description: description,
 		Args:        args,
 	}
@@ -48,17 +48,29 @@ func FloatField(description string) GraphQLField {
 
 // ListField creates a list type GraphQL field
 func ListField(itemType, description string) GraphQLField {
-	return Field("["+itemType+"]", description)
+	return GraphQLField{
+		Type:        createListType(createScalarType(itemType)),
+		Description: description,
+		Args:        make(map[string]interface{}),
+	}
 }
 
 // NonNullField creates a non-null type GraphQL field
 func NonNullField(fieldType, description string) GraphQLField {
-	return Field(fieldType+"!", description)
+	return GraphQLField{
+		Type:        createNonNullType(createScalarType(fieldType)),
+		Description: description,
+		Args:        make(map[string]interface{}),
+	}
 }
 
 // NonNullListField creates a non-null list type GraphQL field
 func NonNullListField(itemType, description string) GraphQLField {
-	return Field("["+itemType+"!]!", description)
+	return GraphQLField{
+		Type:        createNonNullType(createListType(createNonNullType(createScalarType(itemType)))),
+		Description: description,
+		Args:        make(map[string]interface{}),
+	}
 }
 
 // =====================================================
@@ -83,8 +95,11 @@ type ObjectFieldDef struct {
 
 // ComplexObjectField creates a GraphQL field that returns a complex object type
 func ComplexObjectField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
+	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
+	
 	return GraphQLField{
-		Type:        objectDef.TypeName,
+		Type:        createObjectType(objectDef.TypeName, objectFields),
 		Description: description,
 		Args: map[string]interface{}{
 			"objectType": map[string]interface{}{
@@ -110,8 +125,12 @@ func ComplexObjectFieldWithArgs(description string, objectDef ObjectTypeDefiniti
 
 // ListOfObjectsField creates a GraphQL field that returns a list of complex objects
 func ListOfObjectsField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
+	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
+	objectType := createObjectType(objectDef.TypeName, objectFields)
+	
 	return GraphQLField{
-		Type:        "[" + objectDef.TypeName + "]",
+		Type:        createListType(objectType),
 		Description: description,
 		Args: map[string]interface{}{
 			"objectType": map[string]interface{}{
@@ -137,8 +156,12 @@ func ListOfObjectsFieldWithArgs(description string, objectDef ObjectTypeDefiniti
 
 // NonNullListOfObjectsField creates a non-null list of objects field
 func NonNullListOfObjectsField(description string, objectDef ObjectTypeDefinition) GraphQLField {
+	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
+	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
+	objectType := createObjectType(objectDef.TypeName, objectFields)
+	
 	return GraphQLField{
-		Type:        "[" + objectDef.TypeName + "!]!",
+		Type:        createNonNullType(createListType(createNonNullType(objectType))),
 		Description: description,
 		Args: map[string]interface{}{
 			"objectType": map[string]interface{}{
@@ -896,4 +919,93 @@ func GetAllContextData(args map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return contextData
+}
+
+// =====================================================
+// TYPE CREATION HELPERS
+// =====================================================
+
+// createScalarType creates a scalar type definition
+func createScalarType(scalarType string) GraphQLTypeDefinition {
+	return GraphQLTypeDefinition{
+		Kind:       "scalar",
+		ScalarType: scalarType,
+		Name:       scalarType,
+	}
+}
+
+// createObjectType creates an object type definition
+func createObjectType(name string, fields map[string]interface{}) GraphQLTypeDefinition {
+	return GraphQLTypeDefinition{
+		Kind:   "object",
+		Name:   name,
+		Fields: fields,
+	}
+}
+
+// createListType creates a list type definition
+func createListType(ofType GraphQLTypeDefinition) GraphQLTypeDefinition {
+	return GraphQLTypeDefinition{
+		Kind:   "list",
+		OfType: &ofType,
+	}
+}
+
+// createNonNullType creates a non-null type definition
+func createNonNullType(ofType GraphQLTypeDefinition) GraphQLTypeDefinition {
+	return GraphQLTypeDefinition{
+		Kind:   "non_null",
+		OfType: &ofType,
+	}
+}
+
+// convertObjectFieldsToGraphQLFields converts ObjectFieldDef map to GraphQL field definitions
+func convertObjectFieldsToGraphQLFields(fields map[string]ObjectFieldDef) map[string]interface{} {
+	result := make(map[string]interface{})
+	
+	for fieldName, fieldDef := range fields {
+		var fieldType GraphQLTypeDefinition
+		
+		// Start with the base type
+		if isScalarType(fieldDef.Type) {
+			fieldType = createScalarType(fieldDef.Type)
+		} else {
+			// For object types, create a reference
+			fieldType = GraphQLTypeDefinition{
+				Kind: "object",
+				Name: fieldDef.Type,
+			}
+		}
+		
+		// Apply list wrapper if needed
+		if fieldDef.List {
+			if fieldDef.ListOfNonNull {
+				fieldType = createListType(createNonNullType(fieldType))
+			} else {
+				fieldType = createListType(fieldType)
+			}
+		}
+		
+		// Apply non-null wrapper if needed
+		if !fieldDef.Nullable {
+			fieldType = createNonNullType(fieldType)
+		}
+		
+		result[fieldName] = map[string]interface{}{
+			"type":        fieldType,
+			"description": fieldDef.Description,
+		}
+	}
+	
+	return result
+}
+
+// isScalarType checks if a type is a GraphQL scalar type
+func isScalarType(typeName string) bool {
+	switch typeName {
+	case "String", "Int", "Boolean", "Float", "ID":
+		return true
+	default:
+		return false
+	}
 }

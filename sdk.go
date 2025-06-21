@@ -27,10 +27,19 @@ type FunctionHandlerFunc func(ctx context.Context, args map[string]interface{}) 
 
 // GraphQLField represents a GraphQL field definition
 type GraphQLField struct {
-	Type        string                 `json:"type"`
+	Type        interface{}            `json:"type"` // Can be string or GraphQLTypeDefinition
 	Description string                 `json:"description"`
 	Args        map[string]interface{} `json:"args,omitempty"`
 	Resolve     string                 `json:"resolve"`
+}
+
+// GraphQLTypeDefinition represents a complex GraphQL type
+type GraphQLTypeDefinition struct {
+	Kind       string                 `json:"kind"`       // "scalar", "object", "list", "non_null"
+	Name       string                 `json:"name"`       // For scalar and object types
+	OfType     *GraphQLTypeDefinition `json:"ofType"`     // For list and non_null types
+	Fields     map[string]interface{} `json:"fields"`     // For object types
+	ScalarType string                 `json:"scalarType"` // For scalar types: "String", "Int", "Boolean", "Float"
 }
 
 // RESTEndpoint represents a REST API endpoint definition
@@ -272,7 +281,7 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 // serializeGraphQLField converts a GraphQLField to a protobuf-compatible map
 func (impl *pluginImpl) serializeGraphQLField(field GraphQLField) map[string]interface{} {
 	result := map[string]interface{}{
-		"type":        field.Type,
+		"type":        impl.serializeType(field.Type),
 		"description": field.Description,
 		"resolve":     field.Resolve,
 	}
@@ -280,6 +289,50 @@ func (impl *pluginImpl) serializeGraphQLField(field GraphQLField) map[string]int
 	// Serialize arguments if they exist
 	if len(field.Args) > 0 {
 		result["args"] = impl.serializeArgs(field.Args)
+	}
+
+	return result
+}
+
+// serializeType converts a type (string or GraphQLTypeDefinition) to protobuf-compatible format
+func (impl *pluginImpl) serializeType(fieldType interface{}) interface{} {
+	switch t := fieldType.(type) {
+	case string:
+		// Legacy string type - convert to simple scalar type
+		return map[string]interface{}{
+			"kind":       "scalar",
+			"scalarType": t,
+			"name":       t,
+		}
+	case GraphQLTypeDefinition:
+		// New structured type definition
+		return impl.serializeTypeDefinition(t)
+	default:
+		// Fallback to string representation
+		return fmt.Sprintf("%v", fieldType)
+	}
+}
+
+// serializeTypeDefinition converts a GraphQLTypeDefinition to protobuf-compatible format
+func (impl *pluginImpl) serializeTypeDefinition(typeDef GraphQLTypeDefinition) map[string]interface{} {
+	result := map[string]interface{}{
+		"kind": typeDef.Kind,
+	}
+
+	if typeDef.Name != "" {
+		result["name"] = typeDef.Name
+	}
+
+	if typeDef.ScalarType != "" {
+		result["scalarType"] = typeDef.ScalarType
+	}
+
+	if typeDef.OfType != nil {
+		result["ofType"] = impl.serializeTypeDefinition(*typeDef.OfType)
+	}
+
+	if len(typeDef.Fields) > 0 {
+		result["fields"] = impl.serializeArgs(typeDef.Fields)
 	}
 
 	return result
@@ -318,6 +371,10 @@ func (impl *pluginImpl) serializeValue(value interface{}) interface{} {
 	case GraphQLField:
 		// Convert GraphQLField to map
 		return impl.serializeGraphQLField(v)
+
+	case GraphQLTypeDefinition:
+		// Convert GraphQLTypeDefinition to map
+		return impl.serializeTypeDefinition(v)
 
 	default:
 		// Return primitive types as-is (string, int, bool, float, etc.)
