@@ -79,7 +79,7 @@ func Init(name, version, apiKey string) *Plugin {
 	}
 
 	p.impl = &pluginImpl{plugin: p}
-	
+
 	// Set the global plugin instance for resolver access
 	currentPlugin = p
 
@@ -362,6 +362,24 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 	args := make(map[string]interface{})
 	if req.Args != nil {
 		args = req.Args.AsMap()
+	}
+
+	// Extract context data and merge it with arguments
+	// This allows plugins to access sensitive data passed from the host
+	if req.Context != nil {
+		contextData := req.Context.AsMap()
+		log.Printf("Plugin SDK: Context data received: %+v", contextData)
+
+		// Add context data to args with a "context_" prefix to avoid conflicts
+		for key, value := range contextData {
+			contextKey := fmt.Sprintf("context_%s", key)
+			args[contextKey] = value
+		}
+
+		// Also create a new context with the values for proper context propagation
+		for key, value := range contextData {
+			ctx = context.WithValue(ctx, key, value)
+		}
 	}
 
 	var result interface{}

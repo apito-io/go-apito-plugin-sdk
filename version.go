@@ -1,7 +1,7 @@
 package sdk
 
 // Version represents the SDK version
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 // GetVersion returns the current SDK version
 func GetVersion() string {

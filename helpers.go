@@ -1,9 +1,11 @@
 package sdk
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 )
 
 // Field creates a basic GraphQL field
@@ -532,4 +534,85 @@ func ParseArgsForResolver(resolverName string, rawArgs map[string]interface{}) m
 
 	log.Printf("SDK Warning: No field definition found for resolver '%s', returning raw args", resolverName)
 	return rawArgs
+}
+
+// Context data access helpers - these help plugins access sensitive data passed from the host
+
+// GetContextString safely extracts a string value from context data in args
+func GetContextString(args map[string]interface{}, key string, defaultValue ...string) string {
+	contextKey := fmt.Sprintf("context_%s", key)
+	if val, exists := args[contextKey]; exists {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+	return ""
+}
+
+// GetContextFromContext safely extracts a string value directly from context
+func GetContextFromContext(ctx context.Context, key string, defaultValue ...string) string {
+	if val := ctx.Value(key); val != nil {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+	return ""
+}
+
+// GetPluginID extracts the plugin ID from context data
+func GetPluginID(args map[string]interface{}) string {
+	return GetContextString(args, "plugin_id")
+}
+
+// GetPluginIDFromContext extracts the plugin ID directly from context
+func GetPluginIDFromContext(ctx context.Context) string {
+	return GetContextFromContext(ctx, "plugin_id")
+}
+
+// GetProjectID extracts the project ID from context data
+func GetProjectID(args map[string]interface{}) string {
+	return GetContextString(args, "project_id")
+}
+
+// GetProjectIDFromContext extracts the project ID directly from context
+func GetProjectIDFromContext(ctx context.Context) string {
+	return GetContextFromContext(ctx, "project_id")
+}
+
+// GetUserID extracts the user ID from context data
+func GetUserID(args map[string]interface{}) string {
+	return GetContextString(args, "user_id")
+}
+
+// GetUserIDFromContext extracts the user ID directly from context
+func GetUserIDFromContext(ctx context.Context) string {
+	return GetContextFromContext(ctx, "user_id")
+}
+
+// GetTenantID extracts the tenant ID from context data
+func GetTenantID(args map[string]interface{}) string {
+	return GetContextString(args, "tenant_id")
+}
+
+// GetTenantIDFromContext extracts the tenant ID directly from context
+func GetTenantIDFromContext(ctx context.Context) string {
+	return GetContextFromContext(ctx, "tenant_id")
+}
+
+// GetAllContextData extracts all context data from args
+func GetAllContextData(args map[string]interface{}) map[string]interface{} {
+	contextData := make(map[string]interface{})
+	for key, value := range args {
+		if strings.HasPrefix(key, "context_") {
+			actualKey := strings.TrimPrefix(key, "context_")
+			contextData[actualKey] = value
+		}
+	}
+	return contextData
 }
