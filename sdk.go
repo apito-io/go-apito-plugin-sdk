@@ -63,6 +63,9 @@ type Plugin struct {
 	restHandlers map[string]RESTHandlerFunc
 	functions    map[string]FunctionHandlerFunc
 
+	// Type registry for nested objects
+	objectTypes map[string]ObjectTypeDefinition
+
 	// Internal implementation
 	impl *pluginImpl
 }
@@ -85,6 +88,7 @@ func Init(name, version, apiKey string) *Plugin {
 		resolvers:    make(map[string]ResolverFunc),
 		restHandlers: make(map[string]RESTHandlerFunc),
 		functions:    make(map[string]FunctionHandlerFunc),
+		objectTypes:  make(map[string]ObjectTypeDefinition),
 	}
 
 	p.impl = &pluginImpl{plugin: p}
@@ -179,6 +183,23 @@ func (p *Plugin) GetMutationField(name string) (GraphQLField, bool) {
 	return field, exists
 }
 
+// RegisterObjectType registers an object type definition for nested object support
+func (p *Plugin) RegisterObjectType(objectType ObjectTypeDefinition) {
+	p.objectTypes[objectType.TypeName] = objectType
+	log.Printf("Plugin SDK: Registered object type '%s'", objectType.TypeName)
+}
+
+// GetObjectType returns the object type definition for a given name
+func (p *Plugin) GetObjectType(name string) (ObjectTypeDefinition, bool) {
+	objectType, exists := p.objectTypes[name]
+	return objectType, exists
+}
+
+// GetAllObjectTypes returns all registered object types
+func (p *Plugin) GetAllObjectTypes() map[string]ObjectTypeDefinition {
+	return p.objectTypes
+}
+
 // Serve starts the plugin server
 func (p *Plugin) Serve() {
 	log.Printf("Plugin SDK: Starting plugin '%s' server...", p.name)
@@ -257,6 +278,12 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 		mutationsMap[name] = impl.serializeGraphQLField(field)
 	}
 
+	// Convert object types to protobuf struct
+	objectTypesMap := make(map[string]interface{})
+	for name, objectType := range impl.plugin.objectTypes {
+		objectTypesMap[name] = impl.serializeObjectTypeDefinition(objectType)
+	}
+
 	queriesStruct, err := structpb.NewStruct(queriesMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queries struct: %v", err)
@@ -265,6 +292,22 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	mutationsStruct, err := structpb.NewStruct(mutationsMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutations struct: %v", err)
+	}
+
+	// For now, include object types in a custom field or extend the existing schema
+	// We'll add object types as a special query field that the engine can recognize
+	if len(objectTypesMap) > 0 {
+		queriesMap["__objectTypes"] = map[string]interface{}{
+			"type":        "String",
+			"description": "Object type definitions for nested objects",
+			"objectTypes": objectTypesMap,
+		}
+
+		// Recreate the queries struct with object types included
+		queriesStruct, err = structpb.NewStruct(queriesMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to recreate queries struct with object types: %v", err)
+		}
 	}
 
 	schema := &protobuff.ThirdPartyGraphQLSchemas{
@@ -335,6 +378,30 @@ func (impl *pluginImpl) serializeTypeDefinition(typeDef GraphQLTypeDefinition) m
 		result["fields"] = impl.serializeArgs(typeDef.Fields)
 	}
 
+	return result
+}
+
+// serializeObjectTypeDefinition converts an ObjectTypeDefinition to protobuf-compatible format
+func (impl *pluginImpl) serializeObjectTypeDefinition(objectType ObjectTypeDefinition) map[string]interface{} {
+	return map[string]interface{}{
+		"typeName":    objectType.TypeName,
+		"description": objectType.Description,
+		"fields":      impl.serializeObjectFields(objectType.Fields),
+	}
+}
+
+// serializeObjectFields converts ObjectFieldDef map to protobuf-compatible format
+func (impl *pluginImpl) serializeObjectFields(fields map[string]ObjectFieldDef) map[string]interface{} {
+	result := make(map[string]interface{})
+	for fieldName, fieldDef := range fields {
+		result[fieldName] = map[string]interface{}{
+			"type":          fieldDef.Type,
+			"description":   fieldDef.Description,
+			"nullable":      fieldDef.Nullable,
+			"list":          fieldDef.List,
+			"listOfNonNull": fieldDef.ListOfNonNull,
+		}
+	}
 	return result
 }
 

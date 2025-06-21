@@ -257,9 +257,22 @@ func (b *ObjectTypeBuilder) AddFloatField(name, description string, nullable boo
 }
 
 // AddObjectField adds a nested object field to the object type
-func (b *ObjectTypeBuilder) AddObjectField(name, description, objectType string, nullable bool) *ObjectTypeBuilder {
+func (b *ObjectTypeBuilder) AddObjectField(name, description string, objectType interface{}, nullable bool) *ObjectTypeBuilder {
+	var typeName string
+
+	// Handle both string and ObjectTypeDefinition
+	switch ot := objectType.(type) {
+	case string:
+		typeName = ot
+	case ObjectTypeDefinition:
+		typeName = ot.TypeName
+		// The ObjectTypeDefinition is already registered via Build()
+	default:
+		typeName = fmt.Sprintf("%v", objectType)
+	}
+
 	b.def.Fields[name] = ObjectFieldDef{
-		Type:          objectType,
+		Type:          typeName,
 		Description:   description,
 		Nullable:      nullable,
 		List:          false,
@@ -291,12 +304,29 @@ func (b *ObjectTypeBuilder) AddIntListField(name, description string, nullable, 
 }
 
 // AddObjectListField adds a list of objects field
-func (b *ObjectTypeBuilder) AddObjectListField(name, description, objectType string, nullable, listOfNonNull bool) *ObjectTypeBuilder {
-	return b.AddListField(name, description, objectType, nullable, listOfNonNull)
+func (b *ObjectTypeBuilder) AddObjectListField(name, description string, objectType interface{}, nullable, listOfNonNull bool) *ObjectTypeBuilder {
+	var typeName string
+
+	// Handle both string and ObjectTypeDefinition
+	switch ot := objectType.(type) {
+	case string:
+		typeName = ot
+	case ObjectTypeDefinition:
+		typeName = ot.TypeName
+		// The ObjectTypeDefinition is already registered via Build()
+	default:
+		typeName = fmt.Sprintf("%v", objectType)
+	}
+
+	return b.AddListField(name, description, typeName, nullable, listOfNonNull)
 }
 
 // Build returns the completed object type definition
 func (b *ObjectTypeBuilder) Build() ObjectTypeDefinition {
+	// Automatically register the object type with the current plugin instance
+	if currentPlugin != nil {
+		currentPlugin.RegisterObjectType(b.def)
+	}
 	return b.def
 }
 
