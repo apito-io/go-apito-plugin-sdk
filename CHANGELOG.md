@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2024-12-19
+
+### Fixed
+
+- **Pagination Type Issue**: Fixed `PaginatedResponseType` to avoid undefined type references that caused GraphQL schema errors
+- **Type Reference Problem**: Simplified paginated response to use scalar fields instead of complex object references
+- **Schema Validation**: Resolved "fields must be an object" errors in complex nested types
+
+### Changed
+
+- `PaginatedResponseType()` now creates a self-contained type with scalar fields instead of referencing other object types
+- Simplified pagination structure to avoid circular type dependencies
+
+### Technical Notes
+
+- This is a temporary fix to resolve immediate schema validation issues
+- Future versions will implement proper type resolution for complex nested object references
+
 ## [0.1.5] - 2024-12-19
 
 ### Fixed

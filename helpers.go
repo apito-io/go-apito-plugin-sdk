@@ -352,9 +352,16 @@ func ResponseWrapperType(dataType string) ObjectTypeDefinition {
 
 // PaginatedResponseType creates a paginated response type
 func PaginatedResponseType(itemType string) ObjectTypeDefinition {
+	// For now, create a simplified paginated response that doesn't reference other complex types
+	// This avoids the issue of undefined type references
 	return NewObjectType("PaginatedResponse", "A paginated response").
-		AddObjectListField("items", "List of items", itemType, false, false).
-		AddObjectField("pagination", "Pagination information", "PaginationInfo", false).
+		AddStringListField("items", "List of items (simplified)", false, false).
+		AddIntField("totalCount", "Total number of items", false).
+		AddIntField("pageSize", "Number of items per page", false).
+		AddIntField("currentPage", "Current page number", false).
+		AddIntField("totalPages", "Total number of pages", false).
+		AddBooleanField("hasNextPage", "Whether there is a next page", false).
+		AddBooleanField("hasPreviousPage", "Whether there is a previous page", false).
 		AddBooleanField("success", "Whether the operation was successful", false).
 		AddStringField("message", "Response message", true).
 		Build()
