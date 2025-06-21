@@ -97,7 +97,7 @@ type ObjectFieldDef struct {
 func ComplexObjectField(description string, objectDef ObjectTypeDefinition) GraphQLField {
 	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
 	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
-	
+
 	return GraphQLField{
 		Type:        createObjectType(objectDef.TypeName, objectFields),
 		Description: description,
@@ -128,7 +128,7 @@ func ListOfObjectsField(description string, objectDef ObjectTypeDefinition) Grap
 	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
 	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
 	objectType := createObjectType(objectDef.TypeName, objectFields)
-	
+
 	return GraphQLField{
 		Type:        createListType(objectType),
 		Description: description,
@@ -159,7 +159,7 @@ func NonNullListOfObjectsField(description string, objectDef ObjectTypeDefinitio
 	// Convert ObjectTypeDefinition to GraphQLTypeDefinition
 	objectFields := convertObjectFieldsToGraphQLFields(objectDef.Fields)
 	objectType := createObjectType(objectDef.TypeName, objectFields)
-	
+
 	return GraphQLField{
 		Type:        createNonNullType(createListType(createNonNullType(objectType))),
 		Description: description,
@@ -962,10 +962,10 @@ func createNonNullType(ofType GraphQLTypeDefinition) GraphQLTypeDefinition {
 // convertObjectFieldsToGraphQLFields converts ObjectFieldDef map to GraphQL field definitions
 func convertObjectFieldsToGraphQLFields(fields map[string]ObjectFieldDef) map[string]interface{} {
 	result := make(map[string]interface{})
-	
+
 	for fieldName, fieldDef := range fields {
 		var fieldType GraphQLTypeDefinition
-		
+
 		// Start with the base type
 		if isScalarType(fieldDef.Type) {
 			fieldType = createScalarType(fieldDef.Type)
@@ -976,7 +976,7 @@ func convertObjectFieldsToGraphQLFields(fields map[string]ObjectFieldDef) map[st
 				Name: fieldDef.Type,
 			}
 		}
-		
+
 		// Apply list wrapper if needed
 		if fieldDef.List {
 			if fieldDef.ListOfNonNull {
@@ -985,18 +985,18 @@ func convertObjectFieldsToGraphQLFields(fields map[string]ObjectFieldDef) map[st
 				fieldType = createListType(fieldType)
 			}
 		}
-		
+
 		// Apply non-null wrapper if needed
 		if !fieldDef.Nullable {
 			fieldType = createNonNullType(fieldType)
 		}
-		
+
 		result[fieldName] = map[string]interface{}{
 			"type":        fieldType,
 			"description": fieldDef.Description,
 		}
 	}
-	
+
 	return result
 }
 

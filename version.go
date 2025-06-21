@@ -1,7 +1,7 @@
 package sdk
 
-// Version represents the SDK version
-const Version = "0.1.4"
+// Version represents the current version of the Apito Plugin SDK
+const Version = "0.1.5"
 
 // GetVersion returns the current SDK version
 func GetVersion() string {

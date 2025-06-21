@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2024-12-19
+
+### Fixed
+
+- **Engine Compatibility**: Fixed schema registration issues where complex GraphQL types weren't being recognized by the engine
+- **Type System**: Improved compatibility between SDK's structured GraphQL types and engine's type conversion system
+- **Backwards Compatibility**: Maintained full backwards compatibility with existing string-based type definitions
+
+### Technical Changes
+
+- Enhanced engine's `convertGraphQLType` function to handle both string and structured type definitions
+- Added new `convertGraphQLTypeFromData`, `convertStructuredGraphQLType`, and related helper functions
+- Updated schema registration to properly convert SDK's `GraphQLTypeDefinition` objects to native GraphQL types
+- Improved argument type handling in `extractGraphQLArgs` function
+
+## [0.1.4] - 2024-12-19
+
+### Added
+
+- **Proper GraphQL Type System**: Complete rewrite of type handling to generate proper GraphQL type structures
+- **Engine Compatibility**: Types now generate proper `GraphQLTypeDefinition` objects instead of simple strings
+- **Complex Type Support**: Full support for nested objects, arrays, and non-null types
+- **Type Documentation**: Added `TYPE_SYSTEM.md` with comprehensive type structure documentation
+
+### Technical Changes
+
+- Replaced string-based types with structured `GraphQLTypeDefinition` objects
+- Added `createScalarType()`, `createObjectType()`, `createListType()`, `createNonNullType()` helpers
+- Enhanced serialization to handle complex type structures
+- Maintained backwards compatibility with string types
+
+## [0.1.3] - 2024-12-19
+
+### Added
+
+- **Complex Type Support**: Added comprehensive support for complex return types beyond simple strings
+- **Object Type System**: New `ObjectTypeDefinition` and `ObjectFieldDef` for defining complex structures
+- **Type Builders**: Fluent API with `ObjectTypeBuilder` for building complex types
+- **Built-in Types**: Common types like `UserObjectType()`, `PaginationInfoType()`, `ErrorObjectType()`
+- **Advanced Field Functions**: `ComplexObjectField()`, `ListOfObjectsField()`, `PaginatedResponseType()`
+- **Documentation**: Added `COMPLEX_TYPES_EXAMPLES.md` with comprehensive examples
+
+### Enhanced
+
+- Updated hello-world plugin to demonstrate all complex type features
+- Added examples for objects, arrays, pagination, and error handling
+
+## [0.1.1] - 2024-12-19
+
+### Fixed
+
+- **Critical Bug**: Fixed protobuf serialization error when registering GraphQL schemas
+- **Type Serialization**: Added proper serialization for `GraphQLField` and nested argument structures
+- **Engine Compatibility**: Resolved "proto: invalid type: sdk.GraphQLField" error
+
+### Added
+
+- `serializeGraphQLField()` method for converting GraphQL fields to protobuf-compatible maps
+- `serializeArgs()` method for recursive argument serialization
+- `serializeValue()` method for handling nested maps, arrays, and custom types
+
+### Technical Changes
+
+- Updated `SchemaRegister()` to use proper serialization instead of direct field assignment
+- Enhanced error handling and debugging output
+- Improved protobuf compatibility
+
 ## [0.1.0] - 2024-01-20
 
 ### Added
