@@ -281,7 +281,9 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	// Convert object types to protobuf struct
 	objectTypesMap := make(map[string]interface{})
 	for name, objectType := range impl.plugin.objectTypes {
-		objectTypesMap[name] = impl.serializeObjectTypeDefinition(objectType)
+		serialized := impl.serializeObjectTypeDefinition(objectType)
+		objectTypesMap[name] = serialized
+		log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Serializing object type %s: %+v", name, serialized)
 	}
 
 	queriesStruct, err := structpb.NewStruct(queriesMap)
@@ -297,11 +299,13 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	// For now, include object types in a custom field or extend the existing schema
 	// We'll add object types as a special query field that the engine can recognize
 	if len(objectTypesMap) > 0 {
-		queriesMap["__objectTypes"] = map[string]interface{}{
+		objectTypesField := map[string]interface{}{
 			"type":        "String",
 			"description": "Object type definitions for nested objects",
 			"objectTypes": objectTypesMap,
 		}
+		queriesMap["__objectTypes"] = objectTypesField
+		log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Adding __objectTypes field with %d types: %+v", len(objectTypesMap), objectTypesField)
 
 		// Recreate the queries struct with object types included
 		queriesStruct, err = structpb.NewStruct(queriesMap)
@@ -383,10 +387,74 @@ func (impl *pluginImpl) serializeTypeDefinition(typeDef GraphQLTypeDefinition) m
 
 // serializeObjectTypeDefinition converts an ObjectTypeDefinition to protobuf-compatible format
 func (impl *pluginImpl) serializeObjectTypeDefinition(objectType ObjectTypeDefinition) map[string]interface{} {
+	// Convert ObjectFieldDef to the engine's expected format
+	engineFields := make(map[string]interface{})
+	for fieldName, fieldDef := range objectType.Fields {
+		// Convert ObjectFieldDef to engine's GraphQL field format
+		var fieldType map[string]interface{}
+
+		// Start with the base type
+		if impl.isScalarType(fieldDef.Type) {
+			fieldType = map[string]interface{}{
+				"kind":       "scalar",
+				"name":       fieldDef.Type,
+				"scalarType": fieldDef.Type,
+			}
+		} else {
+			// For object types, create a reference
+			fieldType = map[string]interface{}{
+				"kind": "object",
+				"name": fieldDef.Type,
+			}
+		}
+
+		// Apply list wrapper if needed
+		if fieldDef.List {
+			if fieldDef.ListOfNonNull {
+				fieldType = map[string]interface{}{
+					"kind": "list",
+					"ofType": map[string]interface{}{
+						"kind":   "non_null",
+						"ofType": fieldType,
+					},
+				}
+			} else {
+				fieldType = map[string]interface{}{
+					"kind":   "list",
+					"ofType": fieldType,
+				}
+			}
+		}
+
+		// Apply non-null wrapper if needed
+		if !fieldDef.Nullable {
+			fieldType = map[string]interface{}{
+				"kind":   "non_null",
+				"ofType": fieldType,
+			}
+		}
+
+		engineFields[fieldName] = map[string]interface{}{
+			"type":        fieldType,
+			"description": fieldDef.Description,
+		}
+	}
+
 	return map[string]interface{}{
-		"typeName":    objectType.TypeName,
+		"kind":        "object",
+		"name":        objectType.TypeName,
 		"description": objectType.Description,
-		"fields":      impl.serializeObjectFields(objectType.Fields),
+		"fields":      engineFields,
+	}
+}
+
+// isScalarType checks if a type is a GraphQL scalar type
+func (impl *pluginImpl) isScalarType(typeName string) bool {
+	switch typeName {
+	case "String", "Int", "Boolean", "Float", "ID":
+		return true
+	default:
+		return false
 	}
 }
 
