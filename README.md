@@ -254,6 +254,133 @@ Plugin SDK: Found REST handler using old format conversion
 
 This ensures your plugins work with both older and newer versions of the Apito Engine without any code changes.
 
+#### REST API Helper Functions (v0.1.10+)
+
+The SDK provides specialized helper functions for parsing different types of REST API parameters:
+
+**Path Parameters:**
+
+```go
+// Extract path parameters like /users/:id
+userID := sdk.GetPathParam(args, "id", "default-id")
+
+// Handles multiple formats: ":id", "id", "path_id"
+func getUserHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    userID := sdk.GetPathParam(args, "id")
+    if userID == "" {
+        return map[string]interface{}{"error": "User ID required"}, nil
+    }
+    return map[string]interface{}{"user_id": userID}, nil
+}
+```
+
+**Query Parameters:**
+
+```go
+// Extract query parameters like ?limit=10&active=true
+limit := sdk.GetQueryParamInt(args, "limit", 20)
+active := sdk.GetQueryParamBool(args, "active", true)
+search := sdk.GetQueryParam(args, "search", "")
+
+func listUsersHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    // Parse query parameters with defaults
+    limit := sdk.GetQueryParamInt(args, "limit", 20)
+    offset := sdk.GetQueryParamInt(args, "offset", 0)
+    active := sdk.GetQueryParamBool(args, "active", true)
+
+    return map[string]interface{}{
+        "filters": map[string]interface{}{
+            "limit": limit,
+            "offset": offset,
+            "active": active,
+        },
+    }, nil
+}
+```
+
+**Body Parameters:**
+
+```go
+// Extract POST/PUT body parameters
+name := sdk.GetBodyParam(args, "name")
+age := sdk.GetBodyParamInt(args, "age", 0)
+active := sdk.GetBodyParamBool(args, "active", true)
+metadata := sdk.GetBodyParamObject(args, "metadata")
+
+func createUserHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    // Extract and validate body parameters
+    name := sdk.GetBodyParam(args, "name")
+    email := sdk.GetBodyParam(args, "email")
+    age := sdk.GetBodyParamInt(args, "age", 18)
+
+    if name == "" || email == "" {
+        return map[string]interface{}{
+            "success": false,
+            "error": "Name and email are required",
+        }, nil
+    }
+
+    return map[string]interface{}{
+        "success": true,
+        "user": map[string]interface{}{
+            "name": name,
+            "email": email,
+            "age": age,
+        },
+    }, nil
+}
+```
+
+**Unified Parameter Parsing:**
+
+```go
+// Parse all parameters into categorized groups
+func complexRESTHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    // Parse and categorize all parameters
+    parsed := sdk.ParseRESTArgs(args)
+
+    pathParams := parsed["path"].(map[string]interface{})
+    queryParams := parsed["query"].(map[string]interface{})
+    bodyParams := parsed["body"].(map[string]interface{})
+
+    return map[string]interface{}{
+        "path_params": pathParams,
+        "query_params": queryParams,
+        "body_params": bodyParams,
+    }, nil
+}
+```
+
+**Debug Logging:**
+
+```go
+func debugRESTHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    // Log all parameters in a structured way
+    sdk.LogRESTArgs("debugRESTHandler", args)
+
+    // Extract endpoint information
+    endpointInfo := sdk.GetRESTEndpointInfo(args)
+
+    return map[string]interface{}{
+        "endpoint_info": endpointInfo,
+        "message": "Check logs for detailed parameter breakdown",
+    }, nil
+}
+```
+
+**Available REST API Helpers:**
+
+| Function                              | Purpose                     | Example                                 |
+| ------------------------------------- | --------------------------- | --------------------------------------- |
+| `GetPathParam(args, "id")`            | Extract path parameter      | `/users/:id` → `args[":id"]`            |
+| `GetQueryParam(args, "search")`       | Extract query parameter     | `?search=john` → `args["query_search"]` |
+| `GetQueryParamInt(args, "limit", 20)` | Extract integer query param | `?limit=10` with default 20             |
+| `GetQueryParamBool(args, "active")`   | Extract boolean query param | `?active=true`                          |
+| `GetBodyParam(args, "name")`          | Extract body parameter      | POST `{"name": "John"}`                 |
+| `GetBodyParamObject(args, "user")`    | Extract object from body    | POST `{"user": {...}}`                  |
+| `ParseRESTArgs(args)`                 | Categorize all parameters   | Returns `{path, query, body, raw}`      |
+| `LogRESTArgs("handler", args)`        | Debug log all parameters    | Structured console output               |
+
 ### REST Endpoint Builders
 
 ```go

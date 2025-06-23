@@ -1088,3 +1088,259 @@ func isScalarType(typeName string) bool {
 		return false
 	}
 }
+
+// =====================================================
+// REST API SPECIFIC HELPER FUNCTIONS
+// =====================================================
+
+// GetPathParam extracts a path parameter from REST API arguments
+// Path parameters are typically sent as part of the args with keys like ":id", ":userId", etc.
+func GetPathParam(args map[string]interface{}, paramName string, defaultValue ...string) string {
+	// Try with colon prefix first (standard REST path param format)
+	if val, exists := args[":"+paramName]; exists {
+		if str, ok := val.(string); ok && str != "" {
+			return str
+		}
+	}
+
+	// Try without colon prefix
+	if val, exists := args[paramName]; exists {
+		if str, ok := val.(string); ok && str != "" {
+			return str
+		}
+	}
+
+	// Try with "path_" prefix (in case engine sends it this way)
+	if val, exists := args["path_"+paramName]; exists {
+		if str, ok := val.(string); ok && str != "" {
+			return str
+		}
+	}
+
+	// Return default value if provided
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+
+	return ""
+}
+
+// GetQueryParam extracts a query parameter from REST API arguments
+// Query parameters are typically sent with "query_" prefix
+func GetQueryParam(args map[string]interface{}, paramName string, defaultValue ...string) string {
+	// Try with "query_" prefix first
+	if val, exists := args["query_"+paramName]; exists {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+
+	// Try without prefix (direct param name)
+	if val, exists := args[paramName]; exists {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+
+	// Return default value if provided
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+
+	return ""
+}
+
+// GetQueryParamBool extracts a boolean query parameter from REST API arguments
+func GetQueryParamBool(args map[string]interface{}, paramName string, defaultValue ...bool) bool {
+	// Try with "query_" prefix first
+	if val, exists := args["query_"+paramName]; exists {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+		// Handle string representations of boolean
+		if str, ok := val.(string); ok {
+			str = strings.ToLower(str)
+			return str == "true" || str == "1" || str == "yes"
+		}
+	}
+
+	// Try without prefix (direct param name)
+	if val, exists := args[paramName]; exists {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+		// Handle string representations of boolean
+		if str, ok := val.(string); ok {
+			str = strings.ToLower(str)
+			return str == "true" || str == "1" || str == "yes"
+		}
+	}
+
+	// Return default value if provided
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+
+	return false
+}
+
+// GetQueryParamInt extracts an integer query parameter from REST API arguments
+func GetQueryParamInt(args map[string]interface{}, paramName string, defaultValue ...int) int {
+	// Try with "query_" prefix first
+	if val, exists := args["query_"+paramName]; exists {
+		if i, ok := val.(int); ok {
+			return i
+		}
+		if f, ok := val.(float64); ok {
+			return int(f)
+		}
+		if str, ok := val.(string); ok {
+			if i, err := strconv.Atoi(str); err == nil {
+				return i
+			}
+		}
+	}
+
+	// Try without prefix (direct param name)
+	if val, exists := args[paramName]; exists {
+		if i, ok := val.(int); ok {
+			return i
+		}
+		if f, ok := val.(float64); ok {
+			return int(f)
+		}
+		if str, ok := val.(string); ok {
+			if i, err := strconv.Atoi(str); err == nil {
+				return i
+			}
+		}
+	}
+
+	// Return default value if provided
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+
+	return 0
+}
+
+// GetBodyParam extracts a parameter from the POST/PUT/PATCH request body
+// Body parameters don't have prefixes and are sent directly
+func GetBodyParam(args map[string]interface{}, paramName string, defaultValue ...string) string {
+	return GetStringArg(args, paramName, defaultValue...)
+}
+
+// GetBodyParamInt extracts an integer parameter from the request body
+func GetBodyParamInt(args map[string]interface{}, paramName string, defaultValue ...int) int {
+	return GetIntArg(args, paramName, defaultValue...)
+}
+
+// GetBodyParamBool extracts a boolean parameter from the request body
+func GetBodyParamBool(args map[string]interface{}, paramName string, defaultValue ...bool) bool {
+	return GetBoolArg(args, paramName, defaultValue...)
+}
+
+// GetBodyParamObject extracts an object parameter from the request body
+func GetBodyParamObject(args map[string]interface{}, paramName string) map[string]interface{} {
+	return GetObjectArg(args, paramName)
+}
+
+// GetBodyParamArray extracts an array parameter from the request body
+func GetBodyParamArray(args map[string]interface{}, paramName string) []interface{} {
+	return GetArrayArg(args, paramName)
+}
+
+// ParseRESTArgs provides a unified way to parse REST API arguments
+// It returns a map with categorized parameters for easier access
+func ParseRESTArgs(args map[string]interface{}) map[string]interface{} {
+	result := map[string]interface{}{
+		"path":  make(map[string]interface{}),
+		"query": make(map[string]interface{}),
+		"body":  make(map[string]interface{}),
+		"raw":   args, // Keep original args for fallback
+	}
+
+	pathParams := result["path"].(map[string]interface{})
+	queryParams := result["query"].(map[string]interface{})
+	bodyParams := result["body"].(map[string]interface{})
+
+	for key, value := range args {
+		switch {
+		case strings.HasPrefix(key, ":"):
+			// Path parameter
+			paramName := strings.TrimPrefix(key, ":")
+			pathParams[paramName] = value
+
+		case strings.HasPrefix(key, "path_"):
+			// Alternative path parameter format
+			paramName := strings.TrimPrefix(key, "path_")
+			pathParams[paramName] = value
+
+		case strings.HasPrefix(key, "query_"):
+			// Query parameter
+			paramName := strings.TrimPrefix(key, "query_")
+			queryParams[paramName] = value
+
+		case strings.HasPrefix(key, "context_"):
+			// Skip context parameters - they're handled separately
+			continue
+
+		default:
+			// Assume it's a body parameter if no prefix
+			bodyParams[key] = value
+		}
+	}
+
+	return result
+}
+
+// LogRESTArgs logs REST API arguments in a structured way for debugging
+func LogRESTArgs(functionName string, args map[string]interface{}) {
+	log.Printf("🌐 [REST-API] %s called with args:", functionName)
+
+	// Parse args to show them categorized
+	parsed := ParseRESTArgs(args)
+
+	if pathParams := parsed["path"].(map[string]interface{}); len(pathParams) > 0 {
+		log.Printf("  📍 Path Parameters: %+v", pathParams)
+	}
+
+	if queryParams := parsed["query"].(map[string]interface{}); len(queryParams) > 0 {
+		log.Printf("  🔍 Query Parameters: %+v", queryParams)
+	}
+
+	if bodyParams := parsed["body"].(map[string]interface{}); len(bodyParams) > 0 {
+		log.Printf("  📦 Body Parameters: %+v", bodyParams)
+	}
+
+	// Also log raw args for complete debugging
+	log.Printf("  🔧 Raw Arguments: %+v", args)
+}
+
+// GetRESTEndpointInfo extracts information about the current REST endpoint
+// from the context or arguments if available
+func GetRESTEndpointInfo(args map[string]interface{}) map[string]interface{} {
+	info := make(map[string]interface{})
+
+	// Try to extract HTTP method
+	if method := GetContextString(args, "http_method"); method != "" {
+		info["method"] = method
+	}
+
+	// Try to extract path
+	if path := GetContextString(args, "http_path"); path != "" {
+		info["path"] = path
+	}
+
+	// Try to extract user agent
+	if userAgent := GetContextString(args, "user_agent"); userAgent != "" {
+		info["user_agent"] = userAgent
+	}
+
+	// Try to extract remote IP
+	if remoteIP := GetContextString(args, "remote_ip"); remoteIP != "" {
+		info["remote_ip"] = remoteIP
+	}
+
+	return info
+}

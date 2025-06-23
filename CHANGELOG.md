@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2024-12-19
+
+### Added
+
+- **REST API Helper Functions**: Comprehensive set of helper functions for parsing REST API parameters
+- **Path Parameter Helpers**: `GetPathParam()` for extracting path parameters (`:id`, `:userId`, etc.)
+- **Query Parameter Helpers**: `GetQueryParam()`, `GetQueryParamBool()`, `GetQueryParamInt()` for query string parameters
+- **Body Parameter Helpers**: `GetBodyParam()`, `GetBodyParamInt()`, `GetBodyParamBool()`, `GetBodyParamObject()`, `GetBodyParamArray()` for request body data
+- **Unified REST Parser**: `ParseRESTArgs()` categorizes all parameters into path, query, and body sections
+- **Debug Logging**: `LogRESTArgs()` provides structured logging for REST API debugging
+- **Endpoint Info**: `GetRESTEndpointInfo()` extracts HTTP method, path, and request metadata
+
+### Enhanced
+
+- **Type Safety**: All REST helpers include type conversion and validation
+- **Flexible Input**: Handles multiple parameter naming conventions (with/without prefixes)
+- **Default Values**: Support for default values in all parameter extraction functions
+- **Structured Debugging**: Categorized parameter logging for easier troubleshooting
+
+### Technical Features
+
+- **Multiple Format Support**: Handles `:param`, `path_param`, `query_param` naming patterns
+- **Boolean Parsing**: Smart boolean conversion from strings ("true", "1", "yes")
+- **Integer Conversion**: Automatic conversion from strings and floats to integers
+- **Context Integration**: Works with existing context helper functions
+
 ## [0.1.9] - 2024-12-19
 
 ### Fixed
