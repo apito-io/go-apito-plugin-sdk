@@ -458,6 +458,15 @@ func ListArg(itemType, description string) map[string]interface{} {
 	return Arg("["+itemType+"]", description)
 }
 
+// ArrayObjectArg creates an array of objects argument with defined properties
+func ArrayObjectArg(description string, properties map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"type":        "[Object]",
+		"description": description,
+		"properties":  properties,
+	}
+}
+
 // Property creates a property definition for object types
 func Property(propType, description string) map[string]interface{} {
 	return map[string]interface{}{
@@ -835,6 +844,24 @@ func GetBoolArg(args map[string]interface{}, name string, defaultValue ...bool) 
 	return false
 }
 
+// GetFloatArg safely extracts a float argument
+func GetFloatArg(args map[string]interface{}, name string, defaultValue ...float64) float64 {
+	if val, exists := args[name]; exists {
+		switch v := val.(type) {
+		case float64:
+			return v
+		case float32:
+			return float64(v)
+		case int:
+			return float64(v)
+		}
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+	return 0.0
+}
+
 // GetObjectArg safely extracts an object argument
 func GetObjectArg(args map[string]interface{}, name string) map[string]interface{} {
 	if val, exists := args[name]; exists {
@@ -853,6 +880,21 @@ func GetArrayArg(args map[string]interface{}, name string) []interface{} {
 		}
 	}
 	return []interface{}{}
+}
+
+// GetArrayObjectArg safely extracts an array of objects argument and provides typed access to each object
+func GetArrayObjectArg(args map[string]interface{}, name string) []map[string]interface{} {
+	result := []map[string]interface{}{}
+	if val, exists := args[name]; exists {
+		if arr, ok := val.([]interface{}); ok {
+			for _, item := range arr {
+				if obj, ok := item.(map[string]interface{}); ok {
+					result = append(result, obj)
+				}
+			}
+		}
+	}
+	return result
 }
 
 // ParseArgsForResolver automatically parses arguments for the current resolver based on field definition
