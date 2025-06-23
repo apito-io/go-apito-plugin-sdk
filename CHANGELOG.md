@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Debug Logging**: Added comprehensive logging for REST API function resolution
 - **Error Messages**: Improved error messages to show available handlers when lookup fails
 - **Smart Fallback**: Tries direct lookup first, then attempts format conversion
+- **Documentation**: Updated README with detailed explanation of function name compatibility
 
 ### Technical Changes
 

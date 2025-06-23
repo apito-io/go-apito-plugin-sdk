@@ -212,6 +212,48 @@ handlers := map[string]sdk.RESTHandlerFunc{
 plugin.RegisterRESTAPIs(endpoints, handlers)
 ```
 
+#### Function Name Compatibility (v0.1.9+)
+
+The SDK automatically handles both old and new REST API function naming conventions for compatibility with different engine versions:
+
+**Engine Naming Conventions:**
+
+- **Old Format**: `METHOD_/path` (e.g., `GET_/hello`, `POST_/users/:id`)
+- **New Format**: `rest_method_path` (e.g., `rest_get_hello`, `rest_post_users_:id`)
+
+**How It Works:**
+
+```go
+// You register REST APIs the same way regardless of engine version
+plugin.RegisterRESTAPI(sdk.RESTEndpoint{
+    Method: "GET",
+    Path:   "/hello",
+    Description: "Simple hello endpoint",
+}, helloHandler)
+
+// The SDK internally stores the handler with key: "GET_/hello"
+// But can handle calls from engines using either:
+// - Old engine: calls with "GET_/hello" ✅
+// - New engine: calls with "rest_get_hello" ✅ (automatically converted)
+```
+
+**Automatic Conversion Examples:**
+
+- `rest_get_hello` → `GET_/hello`
+- `rest_post_users` → `POST_/users`
+- `rest_get_users_:id` → `GET_/users/:id`
+- `rest_put_users_:id_profile` → `PUT_/users/:id/profile`
+
+**Debug Information:**
+The SDK provides detailed logging when function name conversion occurs:
+
+```
+Plugin SDK: Trying to convert REST function name 'rest_get_hello' to old format 'GET_/hello'
+Plugin SDK: Found REST handler using old format conversion
+```
+
+This ensures your plugins work with both older and newer versions of the Apito Engine without any code changes.
+
 ### REST Endpoint Builders
 
 ```go
