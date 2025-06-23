@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.11] - 2024-12-19
+
+### Fixed
+
+- **CRITICAL**: Fixed `GetBodyParam*` functions to properly handle `body_` prefix from engine
+- **Code Simplification**: Refactored helper functions to reuse existing code and eliminate duplication
+- **Parameter Extraction**: All body parameter helpers now correctly extract parameters sent with `body_` prefix
+
+### Technical Details
+
+- Simplified all `GetBodyParam*` functions to use existing `GetStringArg`, `GetIntArg`, etc. instead of duplicating logic
+- Maintains backward compatibility while properly handling new engine parameter format
+- Cleaner, more maintainable code without repetition
+
 ## [0.1.10] - 2024-12-19
 
 ### Added

@@ -1225,28 +1225,48 @@ func GetQueryParamInt(args map[string]interface{}, paramName string, defaultValu
 }
 
 // GetBodyParam extracts a parameter from the POST/PUT/PATCH request body
-// Body parameters don't have prefixes and are sent directly
+// Body parameters may be sent with "body_" prefix by the engine
 func GetBodyParam(args map[string]interface{}, paramName string, defaultValue ...string) string {
+	// Try with "body_" prefix first, then fallback to GetStringArg
+	if val := GetStringArg(args, "body_"+paramName); val != "" {
+		return val
+	}
 	return GetStringArg(args, paramName, defaultValue...)
 }
 
 // GetBodyParamInt extracts an integer parameter from the request body
 func GetBodyParamInt(args map[string]interface{}, paramName string, defaultValue ...int) int {
+	// Try with "body_" prefix first, then fallback to GetIntArg
+	if val := GetIntArg(args, "body_"+paramName, -999999); val != -999999 {
+		return val
+	}
 	return GetIntArg(args, paramName, defaultValue...)
 }
 
 // GetBodyParamBool extracts a boolean parameter from the request body
 func GetBodyParamBool(args map[string]interface{}, paramName string, defaultValue ...bool) bool {
+	// Try with "body_" prefix first, then fallback to GetBoolArg
+	if _, exists := args["body_"+paramName]; exists {
+		return GetBoolArg(args, "body_"+paramName)
+	}
 	return GetBoolArg(args, paramName, defaultValue...)
 }
 
 // GetBodyParamObject extracts an object parameter from the request body
 func GetBodyParamObject(args map[string]interface{}, paramName string) map[string]interface{} {
+	// Try with "body_" prefix first, then fallback to GetObjectArg
+	if obj := GetObjectArg(args, "body_"+paramName); obj != nil {
+		return obj
+	}
 	return GetObjectArg(args, paramName)
 }
 
 // GetBodyParamArray extracts an array parameter from the request body
 func GetBodyParamArray(args map[string]interface{}, paramName string) []interface{} {
+	// Try with "body_" prefix first, then fallback to GetArrayArg
+	if arr := GetArrayArg(args, "body_"+paramName); arr != nil {
+		return arr
+	}
 	return GetArrayArg(args, paramName)
 }
 
@@ -1280,6 +1300,11 @@ func ParseRESTArgs(args map[string]interface{}) map[string]interface{} {
 			// Query parameter
 			paramName := strings.TrimPrefix(key, "query_")
 			queryParams[paramName] = value
+
+		case strings.HasPrefix(key, "body_"):
+			// Body parameter with explicit prefix
+			paramName := strings.TrimPrefix(key, "body_")
+			bodyParams[paramName] = value
 
 		case strings.HasPrefix(key, "context_"):
 			// Skip context parameters - they're handled separately
