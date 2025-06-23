@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	hcplugin "github.com/hashicorp/go-plugin"
 	"gitlab.com/apito.io/buffers/protobuff"
@@ -590,9 +591,51 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 		}
 
 	case "rest_api":
-		if handler, exists := impl.plugin.restHandlers[req.FunctionName]; exists {
+		// Try to find the handler using the function name directly first
+		handler, exists := impl.plugin.restHandlers[req.FunctionName]
+
+		// If not found, try to convert from new format (rest_method_path) to old format (METHOD_path)
+		if !exists && strings.HasPrefix(req.FunctionName, "rest_") {
+			// Convert from "rest_get_hello" to "GET_/hello"
+			// Or from "rest_post_users_:id" to "POST_/users/:id"
+			parts := strings.SplitN(req.FunctionName, "_", 3) // Split into ["rest", "method", "path"]
+			if len(parts) >= 3 {
+				method := strings.ToUpper(parts[1])
+				pathParts := strings.Split(parts[2], "_")
+
+				// Reconstruct the path with slashes
+				var path strings.Builder
+				path.WriteString("/")
+				for i, part := range pathParts {
+					if i > 0 {
+						path.WriteString("/")
+					}
+					path.WriteString(part)
+				}
+
+				oldFormatKey := method + "_" + path.String()
+				log.Printf("Plugin SDK: Trying to convert REST function name '%s' to old format '%s'", req.FunctionName, oldFormatKey)
+
+				if h, found := impl.plugin.restHandlers[oldFormatKey]; found {
+					handler = h
+					exists = true
+					log.Printf("Plugin SDK: Found REST handler using old format conversion")
+				}
+			}
+		}
+
+		if exists {
 			result, err = handler(ctx, args)
 		} else {
+			// Log available handlers for debugging
+			log.Printf("Plugin SDK: Available REST handlers: %v", func() []string {
+				keys := make([]string, 0, len(impl.plugin.restHandlers))
+				for k := range impl.plugin.restHandlers {
+					keys = append(keys, k)
+				}
+				return keys
+			}())
+
 			return &protobuff.ExecuteResponse{
 				Success: false,
 				Message: fmt.Sprintf("Unknown REST handler: %s", req.FunctionName),

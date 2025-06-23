@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2024-12-19
+
+### Fixed
+
+- **REST API Function Routing**: Fixed compatibility with engine's new REST API function naming convention
+- **Backward Compatibility**: Added support for both old (`METHOD_/path`) and new (`rest_method_path`) function naming formats
+- **Automatic Conversion**: SDK now automatically converts new format function names to internal handler keys
+- **Path Parameter Handling**: Properly handles path parameters like `:id` in function name conversion
+
+### Enhanced
+
+- **Debug Logging**: Added comprehensive logging for REST API function resolution
+- **Error Messages**: Improved error messages to show available handlers when lookup fails
+- **Smart Fallback**: Tries direct lookup first, then attempts format conversion
+
+### Technical Changes
+
+- Updated `Execute()` method in `sdk.go` to handle both REST API naming conventions
+- Added path reconstruction logic for complex REST endpoints
+- Enhanced error handling with detailed debugging information
+
 ## [0.1.6] - 2024-12-19
 
 ### Fixed
