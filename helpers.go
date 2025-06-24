@@ -744,6 +744,9 @@ func (p *ArgParser) parseBooleanArray(rawValue interface{}) []bool {
 
 // parseString safely converts value to string
 func (p *ArgParser) parseString(rawValue interface{}) string {
+	if rawValue == nil {
+		return ""
+	}
 	if str, ok := rawValue.(string); ok {
 		return str
 	}
@@ -804,10 +807,12 @@ func ParseGraphQLArgs(field GraphQLField, rawArgs map[string]interface{}) map[st
 
 // GetStringArg safely extracts a string argument
 func GetStringArg(args map[string]interface{}, name string, defaultValue ...string) string {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		if str, ok := val.(string); ok {
 			return str
 		}
+		// If it's not a string but exists and not nil, convert safely (avoiding "<nil>")
+		return fmt.Sprintf("%v", val)
 	}
 	if len(defaultValue) > 0 {
 		return defaultValue[0]
@@ -817,12 +822,18 @@ func GetStringArg(args map[string]interface{}, name string, defaultValue ...stri
 
 // GetIntArg safely extracts an int argument
 func GetIntArg(args map[string]interface{}, name string, defaultValue ...int) int {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		switch v := val.(type) {
 		case int:
 			return v
 		case float64:
 			return int(v)
+		case int64:
+			return int(v)
+		case string:
+			if i, err := strconv.Atoi(v); err == nil {
+				return i
+			}
 		}
 	}
 	if len(defaultValue) > 0 {
@@ -833,9 +844,15 @@ func GetIntArg(args map[string]interface{}, name string, defaultValue ...int) in
 
 // GetBoolArg safely extracts a boolean argument
 func GetBoolArg(args map[string]interface{}, name string, defaultValue ...bool) bool {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		if b, ok := val.(bool); ok {
 			return b
+		}
+		// Handle string representations of booleans
+		if str, ok := val.(string); ok {
+			if b, err := strconv.ParseBool(str); err == nil {
+				return b
+			}
 		}
 	}
 	if len(defaultValue) > 0 {
@@ -846,7 +863,7 @@ func GetBoolArg(args map[string]interface{}, name string, defaultValue ...bool) 
 
 // GetFloatArg safely extracts a float argument
 func GetFloatArg(args map[string]interface{}, name string, defaultValue ...float64) float64 {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		switch v := val.(type) {
 		case float64:
 			return v
@@ -854,6 +871,12 @@ func GetFloatArg(args map[string]interface{}, name string, defaultValue ...float
 			return float64(v)
 		case int:
 			return float64(v)
+		case int64:
+			return float64(v)
+		case string:
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				return f
+			}
 		}
 	}
 	if len(defaultValue) > 0 {
@@ -864,7 +887,7 @@ func GetFloatArg(args map[string]interface{}, name string, defaultValue ...float
 
 // GetObjectArg safely extracts an object argument
 func GetObjectArg(args map[string]interface{}, name string) map[string]interface{} {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		if obj, ok := val.(map[string]interface{}); ok {
 			return obj
 		}
@@ -874,7 +897,7 @@ func GetObjectArg(args map[string]interface{}, name string) map[string]interface
 
 // GetArrayArg safely extracts an array argument
 func GetArrayArg(args map[string]interface{}, name string) []interface{} {
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		if arr, ok := val.([]interface{}); ok {
 			return arr
 		}
@@ -885,7 +908,7 @@ func GetArrayArg(args map[string]interface{}, name string) []interface{} {
 // GetArrayObjectArg safely extracts an array of objects argument and provides typed access to each object
 func GetArrayObjectArg(args map[string]interface{}, name string) []map[string]interface{} {
 	result := []map[string]interface{}{}
-	if val, exists := args[name]; exists {
+	if val, exists := args[name]; exists && val != nil {
 		if arr, ok := val.([]interface{}); ok {
 			for _, item := range arr {
 				if obj, ok := item.(map[string]interface{}); ok {
