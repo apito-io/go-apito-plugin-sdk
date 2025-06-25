@@ -920,6 +920,113 @@ func GetArrayObjectArg(args map[string]interface{}, name string) []map[string]in
 	return result
 }
 
+// GetStringArrayArg gets a string array argument value with proper type conversion
+func GetStringArrayArg(args map[string]interface{}, name string) []string {
+	if val, exists := args[name]; exists && val != nil {
+		// Handle []interface{} with string values
+		if arr, ok := val.([]interface{}); ok {
+			result := make([]string, len(arr))
+			for i, item := range arr {
+				if str, ok := item.(string); ok {
+					result[i] = str
+				} else {
+					// Convert to string if possible
+					result[i] = fmt.Sprintf("%v", item)
+				}
+			}
+			return result
+		}
+		// Handle direct []string
+		if arr, ok := val.([]string); ok {
+			return arr
+		}
+	}
+	return []string{}
+}
+
+// GetIntArrayArg gets an int array argument value with proper type conversion
+func GetIntArrayArg(args map[string]interface{}, name string) []int {
+	if val, exists := args[name]; exists && val != nil {
+		// Handle []interface{} with numeric values
+		if arr, ok := val.([]interface{}); ok {
+			result := make([]int, 0, len(arr))
+			for _, item := range arr {
+				if intVal, ok := item.(int); ok {
+					result = append(result, intVal)
+				} else if floatVal, ok := item.(float64); ok {
+					result = append(result, int(floatVal))
+				} else if strVal, ok := item.(string); ok {
+					if intVal, err := strconv.Atoi(strVal); err == nil {
+						result = append(result, intVal)
+					}
+				}
+			}
+			return result
+		}
+		// Handle direct []int
+		if arr, ok := val.([]int); ok {
+			return arr
+		}
+	}
+	return []int{}
+}
+
+// GetFloatArrayArg gets a float array argument value with proper type conversion
+func GetFloatArrayArg(args map[string]interface{}, name string) []float64 {
+	if val, exists := args[name]; exists && val != nil {
+		// Handle []interface{} with numeric values
+		if arr, ok := val.([]interface{}); ok {
+			result := make([]float64, 0, len(arr))
+			for _, item := range arr {
+				if floatVal, ok := item.(float64); ok {
+					result = append(result, floatVal)
+				} else if intVal, ok := item.(int); ok {
+					result = append(result, float64(intVal))
+				} else if strVal, ok := item.(string); ok {
+					if floatVal, err := strconv.ParseFloat(strVal, 64); err == nil {
+						result = append(result, floatVal)
+					}
+				}
+			}
+			return result
+		}
+		// Handle direct []float64
+		if arr, ok := val.([]float64); ok {
+			return arr
+		}
+	}
+	return []float64{}
+}
+
+// GetBoolArrayArg gets a bool array argument value with proper type conversion
+func GetBoolArrayArg(args map[string]interface{}, name string) []bool {
+	if val, exists := args[name]; exists && val != nil {
+		// Handle []interface{} with boolean values
+		if arr, ok := val.([]interface{}); ok {
+			result := make([]bool, 0, len(arr))
+			for _, item := range arr {
+				if boolVal, ok := item.(bool); ok {
+					result = append(result, boolVal)
+				} else if strVal, ok := item.(string); ok {
+					if boolVal, err := strconv.ParseBool(strVal); err == nil {
+						result = append(result, boolVal)
+					}
+				} else if intVal, ok := item.(int); ok {
+					result = append(result, intVal != 0)
+				} else if floatVal, ok := item.(float64); ok {
+					result = append(result, floatVal != 0)
+				}
+			}
+			return result
+		}
+		// Handle direct []bool
+		if arr, ok := val.([]bool); ok {
+			return arr
+		}
+	}
+	return []bool{}
+}
+
 // ParseArgsForResolver automatically parses arguments for the current resolver based on field definition
 // This is the main function that plugins should use in their resolvers
 func ParseArgsForResolver(resolverName string, rawArgs map[string]interface{}) map[string]interface{} {

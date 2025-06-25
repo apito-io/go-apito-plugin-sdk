@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.13] - 2024-01-11
+
+### Added
+
+- **Typed Array Helper Functions**: New helper functions for typed array argument extraction
+- **GetStringArrayArg()**: Extracts string arrays with proper type conversion from `[]interface{}`
+- **GetIntArrayArg()**: Extracts integer arrays with conversion from strings and floats
+- **GetFloatArrayArg()**: Extracts float arrays with conversion from strings and integers
+- **GetBoolArrayArg()**: Extracts boolean arrays with smart conversion from strings and numbers
+
+### Enhanced
+
+- **Type Safety**: All array helpers handle `[]interface{}` to typed array conversion automatically
+- **Flexible Conversion**: Support for converting between compatible types (string to int, int to float, etc.)
+- **Backward Compatibility**: Existing `GetArrayArg()` function remains unchanged
+
+### Problem Solved
+
+- Fixed issue where `GetArrayArg()` returns `[]interface{}` but actual values are typed arrays
+- Eliminates empty array issues when dealing with typed arguments from GraphQL/REST APIs
+- Provides safe type conversion with fallback mechanisms
+
+### Usage Example
+
+```go
+// Before: orderIDs would be empty due to type mismatch
+orderIDsRaw := sdk.GetArrayArg(args, "order_ids")  // Returns []interface{}
+
+// After: proper string array extraction
+orderIDs := sdk.GetStringArrayArg(args, "order_ids")  // Returns []string
+```
+
 ## [0.1.11] - 2024-12-19
 
 ### Fixed

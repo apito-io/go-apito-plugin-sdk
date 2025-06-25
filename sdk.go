@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
 	"gitlab.com/apito.io/buffers/protobuff"
 	"google.golang.org/grpc"
@@ -25,6 +28,9 @@ type RESTHandlerFunc func(ctx context.Context, args map[string]interface{}) (int
 
 // FunctionHandlerFunc is the function signature for custom functions
 type FunctionHandlerFunc func(ctx context.Context, args map[string]interface{}) (interface{}, error)
+
+// HealthCheckFunc is the function signature for custom health checks
+type HealthCheckFunc func(ctx context.Context) (map[string]interface{}, error)
 
 // GraphQLField represents a GraphQL field definition
 type GraphQLField struct {
@@ -63,6 +69,7 @@ type Plugin struct {
 	resolvers    map[string]ResolverFunc
 	restHandlers map[string]RESTHandlerFunc
 	functions    map[string]FunctionHandlerFunc
+	healthChecks []HealthCheckFunc
 
 	// Type registry for nested objects
 	objectTypes map[string]ObjectTypeDefinition
@@ -89,15 +96,20 @@ func Init(name, version, apiKey string) *Plugin {
 		resolvers:    make(map[string]ResolverFunc),
 		restHandlers: make(map[string]RESTHandlerFunc),
 		functions:    make(map[string]FunctionHandlerFunc),
+		healthChecks: make([]HealthCheckFunc, 0),
 		objectTypes:  make(map[string]ObjectTypeDefinition),
 	}
 
 	p.impl = &pluginImpl{plugin: p}
 
+	// Register built-in health check function
+	p.functions["health_check"] = func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+		return p.performHealthCheck(ctx)
+	}
+
 	// Set the global plugin instance for resolver access
 	currentPlugin = p
 
-	log.Printf("Plugin SDK: Initialized plugin '%s' version %s", name, version)
 	return p
 }
 
@@ -106,7 +118,7 @@ func (p *Plugin) RegisterQuery(name string, field GraphQLField, resolver Resolve
 	field.Resolve = name + "Resolver"
 	p.queries[name] = field
 	p.resolvers[name] = resolver
-	log.Printf("Plugin SDK: Registered GraphQL query '%s'", name)
+
 }
 
 // RegisterMutation registers a GraphQL mutation
@@ -114,7 +126,7 @@ func (p *Plugin) RegisterMutation(name string, field GraphQLField, resolver Reso
 	field.Resolve = name + "Resolver"
 	p.mutations[name] = field
 	p.resolvers[name] = resolver
-	log.Printf("Plugin SDK: Registered GraphQL mutation '%s'", name)
+
 }
 
 // RegisterQueries registers multiple GraphQL queries at once
@@ -122,8 +134,6 @@ func (p *Plugin) RegisterQueries(queries map[string]GraphQLField, resolvers map[
 	for name, field := range queries {
 		if resolver, exists := resolvers[name]; exists {
 			p.RegisterQuery(name, field, resolver)
-		} else {
-			log.Printf("Plugin SDK: Warning - No resolver found for query '%s'", name)
 		}
 	}
 }
@@ -133,8 +143,6 @@ func (p *Plugin) RegisterMutations(mutations map[string]GraphQLField, resolvers 
 	for name, field := range mutations {
 		if resolver, exists := resolvers[name]; exists {
 			p.RegisterMutation(name, field, resolver)
-		} else {
-			log.Printf("Plugin SDK: Warning - No resolver found for mutation '%s'", name)
 		}
 	}
 }
@@ -153,8 +161,6 @@ func (p *Plugin) RegisterRESTAPIs(endpoints []RESTEndpoint, handlers map[string]
 		handlerKey := endpoint.Method + "_" + endpoint.Path
 		if handler, exists := handlers[handlerKey]; exists {
 			p.RegisterRESTAPI(endpoint, handler)
-		} else {
-			log.Printf("Plugin SDK: Warning - No handler found for REST API %s %s", endpoint.Method, endpoint.Path)
 		}
 	}
 }
@@ -162,7 +168,7 @@ func (p *Plugin) RegisterRESTAPIs(endpoints []RESTEndpoint, handlers map[string]
 // RegisterFunction registers a custom function
 func (p *Plugin) RegisterFunction(name string, function FunctionHandlerFunc) {
 	p.functions[name] = function
-	log.Printf("Plugin SDK: Registered function '%s'", name)
+
 }
 
 // RegisterFunctions registers multiple custom functions at once
@@ -187,7 +193,7 @@ func (p *Plugin) GetMutationField(name string) (GraphQLField, bool) {
 // RegisterObjectType registers an object type definition for nested object support
 func (p *Plugin) RegisterObjectType(objectType ObjectTypeDefinition) {
 	p.objectTypes[objectType.TypeName] = objectType
-	log.Printf("Plugin SDK: Registered object type '%s'", objectType.TypeName)
+
 }
 
 // GetObjectType returns the object type definition for a given name
@@ -203,7 +209,6 @@ func (p *Plugin) GetAllObjectTypes() map[string]ObjectTypeDefinition {
 
 // Serve starts the plugin server
 func (p *Plugin) Serve() {
-	log.Printf("Plugin SDK: Starting plugin '%s' server...", p.name)
 
 	handshakeConfig := hcplugin.HandshakeConfig{
 		ProtocolVersion:  1,
@@ -215,14 +220,18 @@ func (p *Plugin) Serve() {
 		"Plugin": &grpcPlugin{Impl: p.impl},
 	}
 
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:   p.name,
+		Output: os.Stderr,
+		Level:  hclog.Error, // Only show errors
+	})
+
 	hcplugin.Serve(&hcplugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
 		GRPCServer:      hcplugin.DefaultGRPCServer,
+		Logger:          logger,
 	})
-
-	log.Printf("Plugin SDK: Plugin '%s' shutting down...", p.name)
-	os.Exit(0)
 }
 
 // grpcPlugin implements the hcplugin.GRPCPlugin interface
@@ -243,11 +252,9 @@ func (p *grpcPlugin) GRPCClient(ctx context.Context, broker *hcplugin.GRPCBroker
 // Implementation of protobuff.PluginServiceServer methods
 
 func (impl *pluginImpl) Init(ctx context.Context, req *protobuff.InitRequest) (*protobuff.InitResponse, error) {
-	log.Printf("Plugin SDK: Initializing plugin '%s'...", impl.plugin.name)
-
-	// Log environment variables if needed
+	// Set environment variables
 	for _, env := range req.EnvVars {
-		log.Printf("Plugin SDK: Env %s=%s", env.Key, env.Value)
+		os.Setenv(env.Key, env.Value)
 	}
 
 	return &protobuff.InitResponse{
@@ -257,7 +264,6 @@ func (impl *pluginImpl) Init(ctx context.Context, req *protobuff.InitRequest) (*
 }
 
 func (impl *pluginImpl) Migration(ctx context.Context, req *protobuff.MigrationRequest) (*protobuff.MigrationResponse, error) {
-	log.Printf("Plugin SDK: Running migration for plugin '%s'...", impl.plugin.name)
 	return &protobuff.MigrationResponse{
 		Success: true,
 		Message: fmt.Sprintf("No migration needed for plugin '%s'", impl.plugin.name),
@@ -265,7 +271,6 @@ func (impl *pluginImpl) Migration(ctx context.Context, req *protobuff.MigrationR
 }
 
 func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.SchemaRegisterRequest) (*protobuff.SchemaRegisterResponse, error) {
-	log.Printf("Plugin SDK: Registering GraphQL schema for plugin '%s'...", impl.plugin.name)
 
 	// Convert queries to protobuf struct
 	queriesMap := make(map[string]interface{})
@@ -284,7 +289,7 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 	for name, objectType := range impl.plugin.objectTypes {
 		serialized := impl.serializeObjectTypeDefinition(objectType)
 		objectTypesMap[name] = serialized
-		log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Serializing object type %s: %+v", name, serialized)
+		//log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Serializing object type %s: %+v", name, serialized)
 	}
 
 	queriesStruct, err := structpb.NewStruct(queriesMap)
@@ -306,7 +311,7 @@ func (impl *pluginImpl) SchemaRegister(ctx context.Context, req *protobuff.Schem
 			"objectTypes": objectTypesMap,
 		}
 		queriesMap["__objectTypes"] = objectTypesField
-		log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Adding __objectTypes field with %d types: %+v", len(objectTypesMap), objectTypesField)
+		//log.Printf("[NESTED-OBJECT-DEBUG] [SDK] Adding __objectTypes field with %d types: %+v", len(objectTypesMap), objectTypesField)
 
 		// Recreate the queries struct with object types included
 		queriesStruct, err = structpb.NewStruct(queriesMap)
@@ -549,7 +554,6 @@ func (impl *pluginImpl) GetVersion(ctx context.Context, req *protobuff.GetVersio
 }
 
 func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteRequest) (*protobuff.ExecuteResponse, error) {
-	log.Printf("Plugin SDK: Execute called - function: %s, type: %s", req.FunctionName, req.FunctionType)
 
 	// Extract arguments from the request
 	args := make(map[string]interface{})
@@ -561,7 +565,6 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 	// This allows plugins to access sensitive data passed from the host
 	if req.Context != nil {
 		contextData := req.Context.AsMap()
-		log.Printf("Plugin SDK: Context data received: %+v", contextData)
 
 		// Add context data to args with a "context_" prefix to avoid conflicts
 		for key, value := range contextData {
@@ -614,12 +617,10 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 				}
 
 				oldFormatKey := method + "_" + path.String()
-				log.Printf("Plugin SDK: Trying to convert REST function name '%s' to old format '%s'", req.FunctionName, oldFormatKey)
 
 				if h, found := impl.plugin.restHandlers[oldFormatKey]; found {
 					handler = h
 					exists = true
-					log.Printf("Plugin SDK: Found REST handler using old format conversion")
 				}
 			}
 		}
@@ -627,22 +628,13 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 		if exists {
 			result, err = handler(ctx, args)
 		} else {
-			// Log available handlers for debugging
-			log.Printf("Plugin SDK: Available REST handlers: %v", func() []string {
-				keys := make([]string, 0, len(impl.plugin.restHandlers))
-				for k := range impl.plugin.restHandlers {
-					keys = append(keys, k)
-				}
-				return keys
-			}())
-
 			return &protobuff.ExecuteResponse{
 				Success: false,
 				Message: fmt.Sprintf("Unknown REST handler: %s", req.FunctionName),
 			}, nil
 		}
 
-	case "function":
+	case "function", "system":
 		if function, exists := impl.plugin.functions[req.FunctionName]; exists {
 			result, err = function(ctx, args)
 		} else {
@@ -697,7 +689,6 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 }
 
 func (impl *pluginImpl) Debug(ctx context.Context, req *protobuff.DebugRequest) (*protobuff.DebugResponse, error) {
-	log.Printf("Plugin SDK: Debug called with stage: %s", req.Stage)
 
 	result := map[string]interface{}{
 		"plugin":  impl.plugin.name,
@@ -719,4 +710,110 @@ func (impl *pluginImpl) Debug(ctx context.Context, req *protobuff.DebugRequest) 
 	return &protobuff.DebugResponse{
 		Result: anyResult,
 	}, nil
+}
+
+// performHealthCheck performs a comprehensive health check of the plugin
+func (p *Plugin) performHealthCheck(ctx context.Context) (interface{}, error) {
+	startTime := time.Now()
+
+	// Basic plugin health information
+	healthInfo := map[string]interface{}{
+		"status":    "healthy",
+		"plugin":    p.name,
+		"version":   p.version,
+		"timestamp": time.Now().Unix(),
+		"uptime":    time.Since(startTime).Milliseconds(),
+	}
+
+	// Runtime information
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	healthInfo["runtime"] = map[string]interface{}{
+		"goroutines":       runtime.NumGoroutine(),
+		"memory_allocated": memStats.Alloc,
+		"memory_total":     memStats.TotalAlloc,
+		"memory_sys":       memStats.Sys,
+		"gc_cycles":        memStats.NumGC,
+		"go_version":       runtime.Version(),
+	}
+
+	// Plugin registration statistics
+	healthInfo["statistics"] = map[string]interface{}{
+		"queries_registered":       len(p.queries),
+		"mutations_registered":     len(p.mutations),
+		"rest_apis_registered":     len(p.restAPIs),
+		"functions_registered":     len(p.functions),
+		"object_types_defined":     len(p.objectTypes),
+		"health_checks_registered": len(p.healthChecks),
+	}
+
+	// Check if plugin can respond to basic operations
+	healthInfo["capabilities"] = map[string]interface{}{
+		"graphql_queries":   len(p.queries) > 0,
+		"graphql_mutations": len(p.mutations) > 0,
+		"rest_endpoints":    len(p.restAPIs) > 0,
+		"custom_functions":  len(p.functions) > 0,
+		"health_checks":     len(p.healthChecks) > 0,
+	}
+
+	// Environment information
+	healthInfo["environment"] = map[string]interface{}{
+		"pid":      os.Getpid(),
+		"hostname": getHostname(),
+		"os":       runtime.GOOS,
+		"arch":     runtime.GOARCH,
+	}
+
+	// Run custom health checks
+	customHealthResults := make(map[string]interface{})
+	overallStatus := "healthy"
+
+	for i, healthCheck := range p.healthChecks {
+		checkName := fmt.Sprintf("custom_check_%d", i)
+		checkResult, err := healthCheck(ctx)
+		if err != nil {
+			customHealthResults[checkName] = map[string]interface{}{
+				"status": "error",
+				"error":  err.Error(),
+			}
+			overallStatus = "degraded"
+		} else {
+			customHealthResults[checkName] = checkResult
+			// Check if the custom health check indicates an issue
+			if status, ok := checkResult["status"].(string); ok && status != "healthy" {
+				overallStatus = "degraded"
+			}
+		}
+	}
+
+	if len(p.healthChecks) > 0 {
+		healthInfo["custom_health_checks"] = customHealthResults
+	}
+
+	// Update overall status based on custom checks
+	healthInfo["status"] = overallStatus
+
+	return healthInfo, nil
+}
+
+// getHostname safely gets the hostname
+func getHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return hostname
+}
+
+// RegisterHealthCheck registers a custom health check function
+func (p *Plugin) RegisterHealthCheck(healthCheck HealthCheckFunc) {
+	p.healthChecks = append(p.healthChecks, healthCheck)
+}
+
+// RegisterHealthChecks registers multiple custom health check functions at once
+func (p *Plugin) RegisterHealthChecks(healthChecks []HealthCheckFunc) {
+	for _, healthCheck := range healthChecks {
+		p.RegisterHealthCheck(healthCheck)
+	}
 }

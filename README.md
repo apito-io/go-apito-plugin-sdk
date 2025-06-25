@@ -541,3 +541,141 @@ func myResolver(ctx context.Context, args map[string]interface{}) (interface{}, 
 ## License
 
 This SDK is part of the Apito Engine project.
+
+## Typed Array Helper Functions (v0.1.13+)
+
+### Problem Solved
+
+Previously, `sdk.GetArrayArg()` returned `[]interface{}` which required manual type conversion:
+
+```go
+// Old way - manual conversion required
+orderIDsRaw := sdk.GetArrayArg(args, "order_ids")  // Returns []interface{}
+var orderIDs []string
+for _, id := range orderIDsRaw {
+    if idStr, ok := id.(string); ok {
+        orderIDs = append(orderIDs, idStr)
+    }
+}
+```
+
+### New Solution
+
+Now you can use typed array helpers for automatic conversion:
+
+```go
+// New way - automatic type conversion
+orderIDs := sdk.GetStringArrayArg(args, "order_ids")  // Returns []string directly
+```
+
+### Available Functions
+
+#### GetStringArrayArg
+
+Extracts string arrays with automatic type conversion:
+
+```go
+func GetStringArrayArg(args map[string]interface{}, name string) []string
+```
+
+Example:
+
+```go
+// GraphQL argument: order_ids: ["order-123", "order-456", "order-789"]
+orderIDs := sdk.GetStringArrayArg(args, "order_ids")
+// Result: []string{"order-123", "order-456", "order-789"}
+```
+
+#### GetIntArrayArg
+
+Extracts integer arrays with conversion from strings and floats:
+
+```go
+func GetIntArrayArg(args map[string]interface{}, name string) []int
+```
+
+Example:
+
+```go
+// GraphQL argument: quantities: [10, 20, 30]
+quantities := sdk.GetIntArrayArg(args, "quantities")
+// Result: []int{10, 20, 30}
+```
+
+#### GetFloatArrayArg
+
+Extracts float arrays with conversion from strings and integers:
+
+```go
+func GetFloatArrayArg(args map[string]interface{}, name string) []float64
+```
+
+Example:
+
+```go
+// GraphQL argument: prices: [10.5, 20.7, 30.14]
+prices := sdk.GetFloatArrayArg(args, "prices")
+// Result: []float64{10.5, 20.7, 30.14}
+```
+
+#### GetBoolArrayArg
+
+Extracts boolean arrays with smart conversion:
+
+```go
+func GetBoolArrayArg(args map[string]interface{}, name string) []bool
+```
+
+Example:
+
+```go
+// GraphQL argument: flags: [true, false, true]
+flags := sdk.GetBoolArrayArg(args, "flags")
+// Result: []bool{true, false, true}
+```
+
+### Type Conversion Features
+
+- **Flexible Input**: Handles both `[]interface{}` and direct typed arrays
+- **Smart Conversion**: Automatically converts compatible types
+- **Safe Fallbacks**: Returns empty arrays for missing/invalid data
+- **Mixed Types**: String conversion can handle mixed type arrays
+
+### Real-World Usage Example
+
+```go
+func closeAllOrderResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
+    userID := sdk.GetUserID(rawArgs)
+    tenantID := sdk.GetTenantID(rawArgs)
+    args := sdk.ParseArgsForResolver("closeAllOrder", rawArgs)
+
+    // Before: Manual conversion required
+    // orderIDsRaw := sdk.GetArrayArg(args, "order_ids")
+    // var orderIDs []string
+    // for _, id := range orderIDsRaw {
+    //     if idStr, ok := id.(string); ok {
+    //         orderIDs = append(orderIDs, idStr)
+    //     }
+    // }
+
+    // After: Direct typed extraction
+    orderIDs := sdk.GetStringArrayArg(args, "order_ids")
+
+    return processOrders(ctx, userID, tenantID, orderIDs)
+}
+```
+
+### Error Handling
+
+All typed array functions are safe and return empty arrays instead of panicking:
+
+```go
+// Nonexistent key
+result := sdk.GetStringArrayArg(args, "missing_key")  // Returns []string{}
+
+// Empty array
+result := sdk.GetIntArrayArg(args, "empty_array")     // Returns []int{}
+
+// Invalid type (non-array)
+result := sdk.GetFloatArrayArg(args, "string_field")  // Returns []float64{}
+```
