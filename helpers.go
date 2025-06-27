@@ -1468,6 +1468,10 @@ func LogRESTArgs(functionName string, args map[string]interface{}) {
 		log.Printf("  📦 Body Parameters: %+v", bodyParams)
 	}
 
+	if fileUploads, ok := args["file_uploads"].(map[string]interface{}); ok {
+		log.Printf("  📁 File Uploads: %+v", fileUploads)
+	}
+
 	// Also log raw args for complete debugging
 	log.Printf("  🔧 Raw Arguments: %+v", args)
 }
