@@ -1499,3 +1499,119 @@ func GetRESTEndpointInfo(args map[string]interface{}) map[string]interface{} {
 
 	return info
 }
+
+// ========================================
+// FILE UPLOAD EXTENSIONS - NEW IN v0.1.15
+// ========================================
+
+// FileSchema creates a file upload schema for REST API
+func FileSchema(description string) map[string]interface{} {
+	return map[string]interface{}{
+		"type":        "string",
+		"format":      "binary",
+		"description": description,
+	}
+}
+
+// MultipartFormSchema creates a multipart/form-data schema for file uploads
+func MultipartFormSchema(properties map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"type":       "object",
+		"properties": properties,
+	}
+}
+
+// WithFileUpload extends RESTEndpointBuilder to support file uploads
+func (b *RESTEndpointBuilder) WithFileUpload(fileFieldName, description string, additionalFields map[string]interface{}) *RESTEndpointBuilder {
+	properties := map[string]interface{}{
+		fileFieldName: FileSchema(description),
+	}
+
+	// Add additional form fields
+	for key, value := range additionalFields {
+		properties[key] = value
+	}
+
+	b.endpoint.Schema["request"] = map[string]interface{}{
+		"content": map[string]interface{}{
+			"multipart/form-data": map[string]interface{}{
+				"schema": MultipartFormSchema(properties),
+			},
+		},
+	}
+	return b
+}
+
+// WithMultipartForm allows custom multipart form configuration
+func (b *RESTEndpointBuilder) WithMultipartForm(properties map[string]interface{}) *RESTEndpointBuilder {
+	b.endpoint.Schema["request"] = map[string]interface{}{
+		"content": map[string]interface{}{
+			"multipart/form-data": map[string]interface{}{
+				"schema": MultipartFormSchema(properties),
+			},
+		},
+	}
+	return b
+}
+
+// GetFileUpload extracts file upload information from REST API arguments
+func GetFileUpload(args map[string]interface{}, fieldName string) map[string]interface{} {
+	if fileUploads, ok := args["file_uploads"].(map[string]interface{}); ok {
+		if fileInfo, exists := fileUploads[fieldName].(map[string]interface{}); exists {
+			return fileInfo
+		}
+	}
+	return nil
+}
+
+// GetFileUploadBytes extracts file content as bytes from REST API arguments
+func GetFileUploadBytes(args map[string]interface{}, fieldName string) []byte {
+	fileInfo := GetFileUpload(args, fieldName)
+	if fileInfo != nil {
+		if content, ok := fileInfo["content"].([]byte); ok {
+			return content
+		}
+	}
+	return nil
+}
+
+// GetFileUploadInfo extracts file metadata from REST API arguments
+func GetFileUploadInfo(args map[string]interface{}, fieldName string) (filename string, contentType string, size int64) {
+	fileInfo := GetFileUpload(args, fieldName)
+	if fileInfo != nil {
+		if name, ok := fileInfo["filename"].(string); ok {
+			filename = name
+		}
+		if ct, ok := fileInfo["content_type"].(string); ok {
+			contentType = ct
+		}
+		if s, ok := fileInfo["size"].(int64); ok {
+			size = s
+		}
+	}
+	return
+}
+
+// GetMultipartFormValue extracts a form field value from multipart form data
+func GetMultipartFormValue(args map[string]interface{}, fieldName string, defaultValue ...string) string {
+	// First check in body_params for form fields
+	if bodyParams, ok := args["body_params"].(map[string]interface{}); ok {
+		if value, exists := bodyParams[fieldName].(string); exists {
+			return value
+		}
+	}
+
+	// Fallback to query params
+	if queryParams, ok := args["query_params"].(map[string]interface{}); ok {
+		if value, exists := queryParams[fieldName].(string); exists {
+			return value
+		}
+	}
+
+	// Return default value if provided
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+
+	return ""
+}

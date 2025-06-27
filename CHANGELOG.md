@@ -216,3 +216,52 @@ orderIDs := sdk.GetStringArrayArg(args, "order_ids")  // Returns []string
 - Type-safe function signatures
 - Comprehensive helper functions
 - Clear documentation with examples
+
+## [0.1.15] - 2024-12-25
+
+### Added
+
+- **File Upload Support for REST APIs**: Added comprehensive file upload support for REST endpoints
+  - `FileSchema()` helper for defining file upload fields in API schemas
+  - `MultipartFormSchema()` for multipart/form-data schemas
+  - `WithFileUpload()` builder method for REST endpoints with file upload capability
+  - `WithMultipartForm()` for custom multipart form configurations
+  - `GetFileUpload()`, `GetFileUploadBytes()`, `GetFileUploadInfo()` helpers for accessing uploaded files
+  - `GetMultipartFormValue()` for extracting form field values from multipart requests
+
+### Important Notes
+
+- **Backward Compatible**: All existing APIs remain unchanged. New functionality is purely additive.
+- **No Breaking Changes**: Existing plugins will continue to work without modification.
+
+### Example Usage
+
+```go
+// Register a file upload endpoint
+plugin.RegisterRESTAPI(
+    sdk.POSTEndpoint("/share/invoice", "Share invoice with file upload").
+        WithFileUpload("pdf", "Invoice PDF file", map[string]interface{}{
+            "customer_phone": sdk.StringSchema("Customer phone number"),
+            "invoice_no":     sdk.StringSchema("Invoice number"),
+            "order_id":       sdk.StringSchema("Order ID"),
+        }).
+        Build(),
+    shareInvoiceHandler,
+)
+
+// Handle file upload in your handler
+func shareInvoiceHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    // Extract file information
+    filename, contentType, size := sdk.GetFileUploadInfo(args, "pdf")
+    fileContent := sdk.GetFileUploadBytes(args, "pdf")
+
+    // Extract form fields
+    customerPhone := sdk.GetMultipartFormValue(args, "customer_phone")
+    invoiceNo := sdk.GetMultipartFormValue(args, "invoice_no")
+
+    // Process file upload...
+    return uploadResult, nil
+}
+```
+
+## [0.1.14] - 2024-12-20
