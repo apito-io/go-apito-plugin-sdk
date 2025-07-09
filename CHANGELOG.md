@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.15] - 2025-01-30
+## [0.1.17] - 2025-01-30
 
 ### Added
 
@@ -51,6 +51,31 @@ plugin.RegisterQuery("getFilteredTasks",
 - **Type Safety**: Maintains strong typing for object array responses
 - **Documentation**: Complete examples and usage patterns included
 
+## [0.1.16] - 2024-12-28
+
+### Added
+
+- **Enhanced File Upload Support**: Complete set of file upload helper functions for REST API endpoints
+- **File Schema Functions**: `FileSchema()` and `MultipartFormSchema()` for defining file upload schemas
+- **REST Endpoint File Upload Methods**: `WithFileUpload()` and `WithMultipartForm()` for configuring file uploads
+- **File Content Extraction**: `GetFileUpload()`, `GetFileUploadBytes()`, `GetFileUploadInfo()` for accessing uploaded files
+- **Base64 Content Handling**: Automatic detection and decoding of base64-encoded file content
+- **Form Field Extraction**: `GetMultipartFormValue()` for extracting form data from multipart uploads
+
+### Enhanced
+
+- **LogRESTArgs()**: Upgraded to structured, categorized logging with emoji indicators and file upload detection
+- **File Content Processing**: Handles both `[]byte` and base64 string content automatically
+- **Parameter Parsing**: Enhanced `ParseRESTArgs()` for better organization of path, query, and body parameters
+- **Error Handling**: Improved error messages and debugging information for file upload scenarios
+
+### Technical Features
+
+- **Backward Compatibility**: All existing functions continue to work unchanged - NO BREAKING CHANGES
+- **Multiple Content Types**: Support for various file formats with proper MIME type detection
+- **Size Handling**: Proper handling of file sizes as both `int64` and `float64` from JSON
+- **Debug Logging**: Comprehensive logging with 📁, 📄, 🔍, 📦 emoji indicators for easy debugging
+
 ## [0.1.14] - 2025-01-26
 
 ### Enhanced
@@ -62,37 +87,6 @@ plugin.RegisterQuery("getFilteredTasks",
 - **Environment Information**: Health check now reports PID, hostname, OS, and architecture information
 - **Degraded Status Detection**: Smart status monitoring that detects degraded states from custom health checks
 - **Flexible Health Check API**: New `HealthCheckFunc` type allows plugins to implement custom health monitoring logic
-
-### Added
-
-- **New Types**: `HealthCheckFunc` for custom health check implementations
-- **Runtime Monitoring**: Memory stats, goroutine count, garbage collection metrics
-- **Status Aggregation**: Overall plugin status based on all health check results
-- **Error Handling**: Proper error handling and reporting for failed health checks
-
-### Technical Features
-
-- **Zero Breaking Changes**: All enhancements are backward compatible
-- **Automatic Registration**: Built-in health check is automatically registered as `health_check` function
-- **Rich Response Format**: Health check returns comprehensive JSON with categorized information
-- **Context Support**: All health checks receive context for timeout and cancellation support
-
-### Usage Example
-
-```go
-// Register a custom health check
-plugin.RegisterHealthCheck(func(ctx context.Context) (map[string]interface{}, error) {
-    // Check database connectivity, external services, etc.
-    return map[string]interface{}{
-        "status": "healthy",
-        "database_connection": "active",
-        "last_backup": time.Now().Unix(),
-    }, nil
-})
-
-// The health_check function will now include your custom checks
-// Call via GraphQL function or REST API
-```
 
 ## [0.1.13] - 2024-01-11
 
