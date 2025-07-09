@@ -203,6 +203,18 @@ func NewObjectType(typeName, description string) *ObjectTypeBuilder {
 	}
 }
 
+// NewArrayObjectType creates a GraphQL field that returns an array of the specified object type
+// This is a convenience function that wraps ListOfObjectsFieldWithArgs for easier usage
+func NewArrayObjectType(objectDef ObjectTypeDefinition) GraphQLField {
+	return ListOfObjectsField("Array of "+objectDef.Description, objectDef)
+}
+
+// NewArrayObjectTypeWithArgs creates a GraphQL field with arguments that returns an array of the specified object type
+// This is a convenience function that wraps ListOfObjectsFieldWithArgs for easier usage
+func NewArrayObjectTypeWithArgs(objectDef ObjectTypeDefinition, args map[string]interface{}) GraphQLField {
+	return ListOfObjectsFieldWithArgs("Array of "+objectDef.Description, objectDef, args)
+}
+
 // ObjectTypeBuilder helps build complex object type definitions
 type ObjectTypeBuilder struct {
 	def ObjectTypeDefinition

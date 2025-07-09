@@ -166,6 +166,82 @@ sdk.ObjectField("User object", map[string]interface{}{
 })
 ```
 
+#### Complex Object Types (v1.0.0+)
+
+Build complex object types with the object type builder:
+
+```go
+// Define a complex object type
+userType := sdk.NewObjectType("User", "A user in the system").
+    AddStringField("id", "User ID", false).
+    AddStringField("name", "User's full name", false).
+    AddStringField("email", "User's email address", true).
+    AddBooleanField("active", "Whether the user is active", false).
+    Build()
+
+// Use in GraphQL query that returns a single object
+plugin.RegisterQuery("getUserProfile",
+    sdk.ComplexObjectFieldWithArgs("Get user profile by ID", userType, map[string]interface{}{
+        "userId": sdk.StringArg("User ID to fetch"),
+    }),
+    getUserProfileResolver)
+
+// Use in GraphQL query that returns an array of objects
+plugin.RegisterQuery("getUsers",
+    sdk.ListOfObjectsFieldWithArgs("Get a list of users", userType, map[string]interface{}{
+        "limit":  sdk.IntArg("Maximum number of users to return"),
+        "offset": sdk.IntArg("Number of users to skip"),
+    }),
+    getUsersResolver)
+```
+
+#### Array Object Types (v1.0.0+)
+
+Convenient helpers for creating array object fields:
+
+```go
+// Define an object type
+taskType := sdk.NewObjectType("Task", "A task object").
+    AddStringField("id", "Task ID", false).
+    AddStringField("title", "Task title", false).
+    AddStringField("status", "Task status", false).
+    AddBooleanField("completed", "Whether task is completed", false).
+    Build()
+
+// Method 1: Using NewArrayObjectType for simple arrays
+plugin.RegisterQuery("getTasks",
+    sdk.NewArrayObjectType(taskType),
+    getTasksResolver)
+
+// Method 2: Using NewArrayObjectTypeWithArgs for arrays with arguments
+plugin.RegisterQuery("getFilteredTasks",
+    sdk.NewArrayObjectTypeWithArgs(taskType, map[string]interface{}{
+        "status":    sdk.StringArg("Filter by task status"),
+        "completed": sdk.BooleanArg("Filter by completion status"),
+        "limit":     sdk.IntArg("Maximum number of tasks to return"),
+    }),
+    getFilteredTasksResolver)
+
+// Resolver function for array response
+func getTasksResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
+    // Return an array of task objects matching the TaskType schema
+    return []map[string]interface{}{
+        {
+            "id":        "task-1",
+            "title":     "Complete documentation",
+            "status":    "in_progress",
+            "completed": false,
+        },
+        {
+            "id":        "task-2",
+            "title":     "Review code",
+            "status":    "completed",
+            "completed": true,
+        },
+    }, nil
+}
+```
+
 #### Fields with Arguments
 
 ```go
