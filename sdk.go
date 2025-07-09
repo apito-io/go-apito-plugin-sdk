@@ -2,9 +2,11 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -553,6 +555,74 @@ func (impl *pluginImpl) GetVersion(ctx context.Context, req *protobuff.GetVersio
 	}, nil
 }
 
+// isComplexArrayData checks if the result contains complex data that structpb.NewStruct can't handle
+func isComplexArrayData(data interface{}) bool {
+	val := reflect.ValueOf(data)
+
+	// Check if it's a slice/array
+	if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+		if val.Len() == 0 {
+			return false // Empty arrays are fine
+		}
+
+		// Check the first element to see if it's complex
+		firstElem := val.Index(0).Interface()
+		switch firstElem.(type) {
+		case map[string]interface{}:
+			return true // Array of maps - complex
+		case []interface{}:
+			return true // Array of arrays - complex
+		default:
+			// Check if it's a struct type
+			elemVal := reflect.ValueOf(firstElem)
+			if elemVal.Kind() == reflect.Struct {
+				return true // Array of structs - complex
+			}
+		}
+	}
+
+	// Check if it's a map containing complex arrays
+	if val.Kind() == reflect.Map {
+		for _, key := range val.MapKeys() {
+			mapVal := val.MapIndex(key).Interface()
+			if isComplexArrayData(mapVal) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// serializeComplexData serializes complex data as JSON bytes wrapped in anypb.Any
+func serializeComplexData(data interface{}, functionName, functionType string) (*anypb.Any, error) {
+	// Create the result map
+	resultMap := map[string]interface{}{
+		"data":          data,
+		"function_name": functionName,
+		"function_type": functionType,
+		"serialization": "json_bytes", // Flag to indicate this is JSON serialized
+	}
+
+	// JSON serialize the entire result
+	jsonBytes, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to JSON marshal complex data: %v", err)
+	}
+
+	// Pack JSON bytes as anypb.Any with type indication
+	anyResult, err := anypb.New(&structpb.Value{
+		Kind: &structpb.Value_StringValue{
+			StringValue: string(jsonBytes),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create any result from JSON: %v", err)
+	}
+
+	return anyResult, nil
+}
+
 func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteRequest) (*protobuff.ExecuteResponse, error) {
 
 	// Extract arguments from the request
@@ -659,6 +729,24 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 	}
 
 	// Convert result to protobuf Any
+	if isComplexArrayData(result) {
+		log.Printf("🎯 [SDK] Detected complex array data, using JSON bytes serialization")
+		anyResult, err := serializeComplexData(result, req.FunctionName, req.FunctionType)
+		if err != nil {
+			return &protobuff.ExecuteResponse{
+				Success: false,
+				Message: fmt.Sprintf("Failed to serialize complex data: %v", err),
+			}, nil
+		}
+
+		return &protobuff.ExecuteResponse{
+			Success: true,
+			Message: "Execution completed successfully (complex data)",
+			Result:  anyResult,
+		}, nil
+	}
+
+	// Handle simple data with existing structpb approach
 	resultMap := map[string]interface{}{
 		"data":          result,
 		"function_name": req.FunctionName,

@@ -333,6 +333,54 @@ func (b *ObjectTypeBuilder) AddObjectListField(name, description string, objectT
 	return b.AddListField(name, description, typeName, nullable, listOfNonNull)
 }
 
+// AddJSONField adds a JSON field that stores complex data as string but presents as structured GraphQL type
+func (b *ObjectTypeBuilder) AddJSONField(name, description string, structuredType interface{}, nullable bool) *ObjectTypeBuilder {
+	var fieldType string
+	
+	// Handle different types of structured data
+	switch v := structuredType.(type) {
+	case ObjectTypeDefinition:
+		// Single object - present as the object type in GraphQL
+		fieldType = fmt.Sprintf("JSON_%s", v.TypeName)
+	case string:
+		// Array type like "User" -> present as [User] in GraphQL  
+		if nullable {
+			fieldType = fmt.Sprintf("JSON_Array_%s", v)
+		} else {
+			fieldType = fmt.Sprintf("JSON_Array_%s!", v)
+		}
+	default:
+		// Generic JSON field
+		fieldType = "JSON_Generic"
+	}
+	
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:        fieldType,
+		Description: description,
+		Nullable:    nullable,
+		List:        false,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
+// AddJSONArrayField adds a JSON field specifically for arrays
+func (b *ObjectTypeBuilder) AddJSONArrayField(name, description string, itemType ObjectTypeDefinition, nullable bool) *ObjectTypeBuilder {
+	fieldType := fmt.Sprintf("JSON_Array_%s", itemType.TypeName)
+	if !nullable {
+		fieldType += "!"
+	}
+	
+	b.def.Fields[name] = ObjectFieldDef{
+		Type:        fieldType,
+		Description: description,
+		Nullable:    nullable,
+		List:        true,
+		ListOfNonNull: false,
+	}
+	return b
+}
+
 // Build returns the completed object type definition
 func (b *ObjectTypeBuilder) Build() ObjectTypeDefinition {
 	// Automatically register the object type with the current plugin instance
