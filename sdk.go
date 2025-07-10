@@ -19,6 +19,73 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// ========================================
+// ERROR HANDLING WITH HTTP STATUS CODES
+// ========================================
+
+// CodedError represents an error with an HTTP status code
+type CodedError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Details string `json:"details,omitempty"`
+}
+
+func (e *CodedError) Error() string {
+	if e.Details != "" {
+		return fmt.Sprintf("HTTP %d: %s (%s)", e.Code, e.Message, e.Details)
+	}
+	return fmt.Sprintf("HTTP %d: %s", e.Code, e.Message)
+}
+
+// ErrorWithCode creates a new error with HTTP status code
+func ErrorWithCode(code int, message string, details ...string) error {
+	err := &CodedError{
+		Code:    code,
+		Message: message,
+	}
+	if len(details) > 0 {
+		err.Details = details[0]
+	}
+	return err
+}
+
+// Common HTTP error constructors
+func BadRequestError(message string, details ...string) error {
+	return ErrorWithCode(400, message, details...)
+}
+
+func UnauthorizedError(message string, details ...string) error {
+	return ErrorWithCode(401, message, details...)
+}
+
+func ForbiddenError(message string, details ...string) error {
+	return ErrorWithCode(403, message, details...)
+}
+
+func NotFoundError(message string, details ...string) error {
+	return ErrorWithCode(404, message, details...)
+}
+
+func InternalServerError(message string, details ...string) error {
+	return ErrorWithCode(500, message, details...)
+}
+
+// GetErrorCode extracts HTTP status code from error, returns 500 for unknown errors
+func GetErrorCode(err error) int {
+	if codedErr, ok := err.(*CodedError); ok {
+		return codedErr.Code
+	}
+	return 500 // Default to internal server error
+}
+
+// GetErrorMessage extracts error message, handling both coded and regular errors
+func GetErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 // Global plugin instance for resolver access
 var currentPlugin *Plugin
 
