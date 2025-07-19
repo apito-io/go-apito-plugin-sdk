@@ -3,7 +3,7 @@ module example-plugin
 go 1.22
 
 require (
-	github.com/apito-io/go-apito-plugin-sdk v0.1.0
+	github.com/apito-io/go-apito-plugin-sdk v0.1.20
 )
 
 require (
@@ -16,7 +16,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mitchellh/go-testing-interface v0.0.0-20171004221916-a61a99592b77 // indirect
 	github.com/oklog/run v1.0.0 // indirect
-	gitlab.com/apito.io/buffers v0.0.0 // indirect
 	golang.org/x/net v0.16.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

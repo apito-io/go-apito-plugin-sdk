@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apito-io/types/protobuff"
 	"github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
-	"gitlab.com/apito.io/buffers/protobuff"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
