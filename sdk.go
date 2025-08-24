@@ -20,7 +20,7 @@ import (
 )
 
 // ========================================
-// ERROR HANDLING WITH HTTP STATUS CODES
+// ERROR HANDLING WITH HTTP STATUS CODES AND GRAPHQL ERRORS
 // ========================================
 
 // CodedError represents an error with an HTTP status code
@@ -30,11 +30,38 @@ type CodedError struct {
 	Details string `json:"details,omitempty"`
 }
 
+// GraphQLError represents a GraphQL-specific error
+type GraphQLError struct {
+	Message    string                 `json:"message"`
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	Path       []interface{}          `json:"path,omitempty"`
+	Locations  []GraphQLErrorLocation `json:"locations,omitempty"`
+}
+
+// GraphQLErrorLocation represents the location of a GraphQL error
+type GraphQLErrorLocation struct {
+	Line   int `json:"line"`
+	Column int `json:"column"`
+}
+
+// GraphQLErrorExtensions represents common GraphQL error extensions
+type GraphQLErrorExtensions struct {
+	Code        string `json:"code"`
+	Exception   string `json:"exception,omitempty"`
+	Timestamp   string `json:"timestamp,omitempty"`
+	PluginName  string `json:"pluginName,omitempty"`
+	RequestID   string `json:"requestId,omitempty"`
+}
+
 func (e *CodedError) Error() string {
 	if e.Details != "" {
 		return fmt.Sprintf("HTTP %d: %s (%s)", e.Code, e.Message, e.Details)
 	}
 	return fmt.Sprintf("HTTP %d: %s", e.Code, e.Message)
+}
+
+func (e *GraphQLError) Error() string {
+	return e.Message
 }
 
 // ErrorWithCode creates a new error with HTTP status code
@@ -70,6 +97,97 @@ func InternalServerError(message string, details ...string) error {
 	return ErrorWithCode(500, message, details...)
 }
 
+// GraphQL Error constructors
+
+// GraphQLErrorWithMessage creates a basic GraphQL error with just a message
+func GraphQLErrorWithMessage(message string) error {
+	return &GraphQLError{
+		Message: message,
+	}
+}
+
+// GraphQLErrorWithCode creates a GraphQL error with an error code in extensions
+func GraphQLErrorWithCode(code, message string) error {
+	return &GraphQLError{
+		Message: message,
+		Extensions: map[string]interface{}{
+			"code": code,
+		},
+	}
+}
+
+// GraphQLErrorWithExtensions creates a GraphQL error with custom extensions
+func GraphQLErrorWithExtensions(message string, extensions map[string]interface{}) error {
+	return &GraphQLError{
+		Message:    message,
+		Extensions: extensions,
+	}
+}
+
+// Common GraphQL error constructors
+
+func GraphQLValidationError(message string, field ...string) error {
+	extensions := map[string]interface{}{
+		"code": "VALIDATION_ERROR",
+	}
+	if len(field) > 0 {
+		extensions["field"] = field[0]
+	}
+	return &GraphQLError{
+		Message:    message,
+		Extensions: extensions,
+	}
+}
+
+func GraphQLAuthenticationError(message string) error {
+	return &GraphQLError{
+		Message: message,
+		Extensions: map[string]interface{}{
+			"code": "UNAUTHENTICATED",
+		},
+	}
+}
+
+func GraphQLAuthorizationError(message string) error {
+	return &GraphQLError{
+		Message: message,
+		Extensions: map[string]interface{}{
+			"code": "FORBIDDEN",
+		},
+	}
+}
+
+func GraphQLNotFoundError(message string) error {
+	return &GraphQLError{
+		Message: message,
+		Extensions: map[string]interface{}{
+			"code": "NOT_FOUND",
+		},
+	}
+}
+
+func GraphQLInternalError(message string) error {
+	return &GraphQLError{
+		Message: message,
+		Extensions: map[string]interface{}{
+			"code": "INTERNAL_ERROR",
+		},
+	}
+}
+
+func GraphQLBadUserInputError(message string, field ...string) error {
+	extensions := map[string]interface{}{
+		"code": "BAD_USER_INPUT",
+	}
+	if len(field) > 0 {
+		extensions["field"] = field[0]
+	}
+	return &GraphQLError{
+		Message:    message,
+		Extensions: extensions,
+	}
+}
+
 // GetErrorCode extracts HTTP status code from error, returns 500 for unknown errors
 func GetErrorCode(err error) int {
 	if codedErr, ok := err.(*CodedError); ok {
@@ -84,6 +202,26 @@ func GetErrorMessage(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+// IsGraphQLError checks if an error is a GraphQL error
+func IsGraphQLError(err error) bool {
+	_, ok := err.(*GraphQLError)
+	return ok
+}
+
+// IsCodedError checks if an error is a coded HTTP error
+func IsCodedError(err error) bool {
+	_, ok := err.(*CodedError)
+	return ok
+}
+
+// GetGraphQLError safely extracts GraphQL error details
+func GetGraphQLError(err error) *GraphQLError {
+	if gqlErr, ok := err.(*GraphQLError); ok {
+		return gqlErr
+	}
+	return nil
 }
 
 // Global plugin instance for resolver access
@@ -789,10 +927,92 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 	}
 
 	if err != nil {
-		return &protobuff.ExecuteResponse{
-			Success: false,
-			Message: fmt.Sprintf("Execution failed: %v", err),
-		}, nil
+		// Handle GraphQL errors differently from REST/function errors
+		if req.FunctionType == "graphql_query" || req.FunctionType == "graphql_mutation" {
+			if IsGraphQLError(err) {
+				// Return GraphQL error as structured data
+				gqlErr := GetGraphQLError(err)
+				errorResult := map[string]interface{}{
+					"errors": []map[string]interface{}{
+						{
+							"message":    gqlErr.Message,
+							"extensions": gqlErr.Extensions,
+							"path":       gqlErr.Path,
+							"locations":  gqlErr.Locations,
+						},
+					},
+					"data": nil,
+				}
+
+				resultStruct, err := structpb.NewStruct(errorResult)
+				if err != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to serialize GraphQL error: %v", err),
+					}, nil
+				}
+
+				anyResult, err := anypb.New(resultStruct)
+				if err != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to create GraphQL error result: %v", err),
+					}, nil
+				}
+
+				return &protobuff.ExecuteResponse{
+					Success: true,
+					Message: "GraphQL error returned",
+					Result:  anyResult,
+				}, nil
+			} else {
+				// Convert regular errors to GraphQL errors for GraphQL operations
+				gqlErr := &GraphQLError{
+					Message: err.Error(),
+					Extensions: map[string]interface{}{
+						"code": "INTERNAL_ERROR",
+					},
+				}
+
+				errorResult := map[string]interface{}{
+					"errors": []map[string]interface{}{
+						{
+							"message":    gqlErr.Message,
+							"extensions": gqlErr.Extensions,
+						},
+					},
+					"data": nil,
+				}
+
+				resultStruct, err := structpb.NewStruct(errorResult)
+				if err != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to serialize converted GraphQL error: %v", err),
+					}, nil
+				}
+
+				anyResult, err := anypb.New(resultStruct)
+				if err != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to create converted GraphQL error result: %v", err),
+					}, nil
+				}
+
+				return &protobuff.ExecuteResponse{
+					Success: true,
+					Message: "Error converted to GraphQL format",
+					Result:  anyResult,
+				}, nil
+			}
+		} else {
+			// For REST API and functions, keep the original error handling
+			return &protobuff.ExecuteResponse{
+				Success: false,
+				Message: fmt.Sprintf("Execution failed: %v", err),
+			}, nil
+		}
 	}
 
 	// Convert result to protobuf Any

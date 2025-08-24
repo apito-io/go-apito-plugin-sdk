@@ -5,6 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.21] - 2025-01-03
+
+### Added
+
+- **GraphQL Error Support**: Complete support for proper GraphQL error handling in mutations and queries
+- **GraphQLError Types**: New error types specifically designed for GraphQL operations
+  - `GraphQLError`: Main GraphQL error structure with message, extensions, path, and locations
+  - `GraphQLErrorLocation`: Error location information for GraphQL errors
+  - `GraphQLErrorExtensions`: Common error extension fields
+- **GraphQL Error Constructors**: Comprehensive set of error creation functions
+  - `GraphQLErrorWithMessage()`: Basic GraphQL error with message
+  - `GraphQLErrorWithCode()`: GraphQL error with error code in extensions
+  - `GraphQLErrorWithExtensions()`: GraphQL error with custom extensions
+  - `GraphQLValidationError()`: Validation error for form/input validation
+  - `GraphQLAuthenticationError()`: Authentication required error
+  - `GraphQLAuthorizationError()`: Authorization/permission denied error
+  - `GraphQLNotFoundError()`: Resource not found error
+  - `GraphQLInternalError()`: Internal server error
+  - `GraphQLBadUserInputError()`: Bad user input error
+- **Resolver Helper Functions**: Convenient functions for returning GraphQL errors from resolvers
+  - `ReturnGraphQLError()`: Return any GraphQL error from resolver
+  - `ReturnValidationError()`: Return validation error from resolver
+  - `ReturnAuthenticationError()`: Return authentication error from resolver
+  - `ReturnAuthorizationError()`: Return authorization error from resolver
+  - `ReturnNotFoundError()`: Return not found error from resolver
+  - `ReturnInternalError()`: Return internal error from resolver
+  - `ReturnBadUserInputError()`: Return bad input error from resolver
+  - `ValidateAndReturn()`: Conditional validation with error or success result
+  - `ValidateFieldAndReturn()`: Field validation with error or success result
+  - `HandleErrorAndReturn()`: Convert any error to appropriate GraphQL error
+- **Error Detection Functions**: Utility functions for error type checking
+  - `IsGraphQLError()`: Check if error is a GraphQL error
+  - `IsCodedError()`: Check if error is a coded HTTP error
+  - `GetGraphQLError()`: Safely extract GraphQL error details
+
+### Enhanced
+
+- **Execute Method**: Modified to handle GraphQL errors differently from REST API errors
+  - GraphQL operations now return properly formatted GraphQL error responses
+  - REST API operations continue to use HTTP status code based error handling
+  - Automatic conversion of regular errors to GraphQL format for GraphQL operations
+- **Error Handling**: Backward compatible error handling that works with existing plugins
+- **Developer Experience**: Simplified error handling in GraphQL resolvers with intuitive helper functions
+
+### Fixed
+
+- **GraphQL Mutation Errors**: Resolved issue where GraphQL mutation errors returned null response objects instead of proper GraphQL errors
+- **Error Response Format**: Fixed error response format to comply with GraphQL specification
+
+### Usage Example
+
+```go
+// In your GraphQL resolver function:
+func (s *SuchokFunction) _changeEmployeePassword(ctx context.Context, userID, tenantID string, input map[string]interface{}) (interface{}, error) {
+    // Validate input
+    if employeeID := sdk.GetStringArg(input, "employee_id"); employeeID == "" {
+        return sdk.ReturnValidationError("Employee ID is required", "employee_id")
+    }
+    
+    // Check authentication
+    if !isAuthenticated(userID) {
+        return sdk.ReturnAuthenticationError("You must be logged in to change passwords")
+    }
+    
+    // Check authorization
+    if !hasPermission(userID, "change_password") {
+        return sdk.ReturnAuthorizationError("You don't have permission to change employee passwords")
+    }
+    
+    // Business logic...
+    if err := changePassword(employeeID, newPassword); err != nil {
+        return sdk.HandleErrorAndReturn(err, "Failed to change employee password")
+    }
+    
+    return map[string]interface{}{
+        "success": true,
+        "message": "Password changed successfully",
+    }, nil
+}
+```
+
+### Breaking Changes
+
+- None - All changes are backward compatible
+
 ## [0.1.17] - 2025-01-30
 
 ### Added

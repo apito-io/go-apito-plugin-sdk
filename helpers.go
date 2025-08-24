@@ -1680,6 +1680,101 @@ func GetMultipartFormValue(args map[string]interface{}, fieldName string, defaul
 	return ""
 }
 
+// ========================================
+// GRAPHQL ERROR HELPERS FOR RESOLVERS
+// ========================================
 
+// These functions provide convenient ways for plugin developers to return
+// properly formatted GraphQL errors from their resolver functions.
 
+// ReturnGraphQLError is a convenience function that plugin developers can use
+// to return a GraphQL error from their resolver functions
+func ReturnGraphQLError(message string, code ...string) (interface{}, error) {
+	if len(code) > 0 {
+		return nil, GraphQLErrorWithCode(code[0], message)
+	}
+	return nil, GraphQLErrorWithMessage(message)
+}
 
+// ReturnValidationError returns a validation error for GraphQL resolvers
+func ReturnValidationError(message string, field ...string) (interface{}, error) {
+	return nil, GraphQLValidationError(message, field...)
+}
+
+// ReturnAuthenticationError returns an authentication error for GraphQL resolvers
+func ReturnAuthenticationError(message string) (interface{}, error) {
+	return nil, GraphQLAuthenticationError(message)
+}
+
+// ReturnAuthorizationError returns an authorization error for GraphQL resolvers
+func ReturnAuthorizationError(message string) (interface{}, error) {
+	return nil, GraphQLAuthorizationError(message)
+}
+
+// ReturnNotFoundError returns a not found error for GraphQL resolvers
+func ReturnNotFoundError(message string) (interface{}, error) {
+	return nil, GraphQLNotFoundError(message)
+}
+
+// ReturnInternalError returns an internal error for GraphQL resolvers
+func ReturnInternalError(message string) (interface{}, error) {
+	return nil, GraphQLInternalError(message)
+}
+
+// ReturnBadUserInputError returns a bad user input error for GraphQL resolvers
+func ReturnBadUserInputError(message string, field ...string) (interface{}, error) {
+	return nil, GraphQLBadUserInputError(message, field...)
+}
+
+// ReturnGraphQLErrorWithExtensions returns a GraphQL error with custom extensions
+func ReturnGraphQLErrorWithExtensions(message string, extensions map[string]interface{}) (interface{}, error) {
+	return nil, GraphQLErrorWithExtensions(message, extensions)
+}
+
+// ValidateAndReturn is a helper function that validates a condition and returns
+// a GraphQL error if the condition is false, otherwise returns the success result
+func ValidateAndReturn(condition bool, errorMessage string, successResult interface{}, errorCode ...string) (interface{}, error) {
+	if !condition {
+		if len(errorCode) > 0 {
+			return nil, GraphQLErrorWithCode(errorCode[0], errorMessage)
+		}
+		return nil, GraphQLValidationError(errorMessage)
+	}
+	return successResult, nil
+}
+
+// ValidateFieldAndReturn validates a field value and returns appropriate error or success result
+func ValidateFieldAndReturn(value interface{}, fieldName string, required bool, successResult interface{}) (interface{}, error) {
+	if required && (value == nil || value == "") {
+		return nil, GraphQLValidationError(fmt.Sprintf("%s is required", fieldName), fieldName)
+	}
+	return successResult, nil
+}
+
+// HandleErrorAndReturn converts any error to an appropriate GraphQL error response
+func HandleErrorAndReturn(err error, defaultMessage string) (interface{}, error) {
+	if err == nil {
+		return nil, GraphQLInternalError("Unexpected nil error")
+	}
+	
+	// If it's already a GraphQL error, return it as-is
+	if IsGraphQLError(err) {
+		return nil, err
+	}
+	
+	// If it's a coded error, convert it to GraphQL error
+	if IsCodedError(err) {
+		codedErr := err.(*CodedError)
+		extensions := map[string]interface{}{
+			"code": "HTTP_ERROR",
+			"httpStatusCode": codedErr.Code,
+		}
+		if codedErr.Details != "" {
+			extensions["details"] = codedErr.Details
+		}
+		return nil, GraphQLErrorWithExtensions(codedErr.Message, extensions)
+	}
+	
+	// For any other error, wrap it as an internal error
+	return nil, GraphQLInternalError(fmt.Sprintf("%s: %v", defaultMessage, err))
+}
