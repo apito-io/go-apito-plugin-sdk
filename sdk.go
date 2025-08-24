@@ -932,17 +932,17 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 			if IsGraphQLError(err) {
 				// Return GraphQL error as structured data
 				gqlErr := GetGraphQLError(err)
-				
+
 				// Create the error object with safe serialization
 				errorObj := map[string]interface{}{
 					"message": gqlErr.Message,
 				}
-				
+
 				// Add extensions if they exist
 				if gqlErr.Extensions != nil && len(gqlErr.Extensions) > 0 {
 					errorObj["extensions"] = gqlErr.Extensions
 				}
-				
+
 				// Add path if it exists and is not empty
 				if gqlErr.Path != nil && len(gqlErr.Path) > 0 {
 					// Convert path to string array for safe serialization
@@ -952,7 +952,7 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 					}
 					errorObj["path"] = pathStrings
 				}
-				
+
 				// Add locations if they exist and are not empty
 				if gqlErr.Locations != nil && len(gqlErr.Locations) > 0 {
 					locations := make([]map[string]interface{}, len(gqlErr.Locations))
@@ -964,10 +964,21 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 					}
 					errorObj["locations"] = locations
 				}
-				
+
+				// Since protobuf can't handle []map[string]interface{} directly,
+				// we'll serialize the errors as a JSON string and let the engine handle it
+				errorsJSON, jsonErr := json.Marshal([]map[string]interface{}{errorObj})
+				if jsonErr != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to marshal GraphQL error to JSON: %v", jsonErr),
+					}, nil
+				}
+
 				errorResult := map[string]interface{}{
-					"errors": []map[string]interface{}{errorObj},
-					"data":   nil,
+					"graphql_errors": string(errorsJSON), // Send as JSON string
+					"data":           nil,
+					"is_graphql_error": true, // Flag to indicate this is a GraphQL error
 				}
 
 				resultStruct, err := structpb.NewStruct(errorResult)
@@ -993,16 +1004,26 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 				}, nil
 			} else {
 				// Convert regular errors to GraphQL errors for GraphQL operations
-				errorResult := map[string]interface{}{
-					"errors": []map[string]interface{}{
-						{
-							"message": err.Error(),
-							"extensions": map[string]interface{}{
-								"code": "INTERNAL_ERROR",
-							},
-						},
+				errorObj := map[string]interface{}{
+					"message": err.Error(),
+					"extensions": map[string]interface{}{
+						"code": "INTERNAL_ERROR",
 					},
-					"data": nil,
+				}
+
+				// Serialize as JSON string for protobuf compatibility
+				errorsJSON, jsonErr := json.Marshal([]map[string]interface{}{errorObj})
+				if jsonErr != nil {
+					return &protobuff.ExecuteResponse{
+						Success: false,
+						Message: fmt.Sprintf("Failed to marshal converted GraphQL error to JSON: %v", jsonErr),
+					}, nil
+				}
+
+				errorResult := map[string]interface{}{
+					"graphql_errors":   string(errorsJSON),
+					"data":             nil,
+					"is_graphql_error": true,
 				}
 
 				resultStruct, err := structpb.NewStruct(errorResult)

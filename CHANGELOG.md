@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.23] - 2025-01-03
+
+### Fixed
+
+- **Critical Protobuf Serialization Issue**: Fixed persistent "invalid type: []map[string]interface {}" error
+- **GraphQL Error Transport**: Changed approach to serialize GraphQL errors as JSON strings for protobuf compatibility
+- **Engine Integration**: Added `is_graphql_error` flag and `graphql_errors` field for proper error handling
+- **Backward Compatibility**: Maintained GraphQL specification compliance while ensuring protobuf transport works
+
+### Technical Changes
+
+The root issue was that protobuf's `structpb.NewStruct()` cannot handle `[]map[string]interface{}` types directly. The fix:
+
+- Serialize GraphQL errors as JSON strings using `json.Marshal()`
+- Transport errors in `graphql_errors` field as string
+- Add `is_graphql_error` flag for engine to properly parse and format
+- Engine can then deserialize the JSON string and format as proper GraphQL errors
+
+This approach ensures both protobuf compatibility and GraphQL specification compliance.
+
 ## [0.1.22] - 2025-01-03
 
 ### Fixed
@@ -12,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GraphQL Error Serialization**: Fixed "proto: invalid type: []map[string]interface {}" error when serializing GraphQL errors
 - **Protobuf Compatibility**: Ensured all GraphQL error fields are protobuf-compatible
   - Convert `Path` field from `[]interface{}` to `[]string` for safe serialization
-  - Convert `Locations` field from `[]GraphQLErrorLocation` to `[]map[string]interface{}` 
+  - Convert `Locations` field from `[]GraphQLErrorLocation` to `[]map[string]interface{}`
   - Only include `extensions`, `path`, and `locations` fields if they exist and are not empty
 - **Error Response Stability**: GraphQL error responses now serialize correctly without protobuf failures
 
@@ -78,22 +98,22 @@ func (s *SuchokFunction) _changeEmployeePassword(ctx context.Context, userID, te
     if employeeID := sdk.GetStringArg(input, "employee_id"); employeeID == "" {
         return sdk.ReturnValidationError("Employee ID is required", "employee_id")
     }
-    
+
     // Check authentication
     if !isAuthenticated(userID) {
         return sdk.ReturnAuthenticationError("You must be logged in to change passwords")
     }
-    
+
     // Check authorization
     if !hasPermission(userID, "change_password") {
         return sdk.ReturnAuthorizationError("You don't have permission to change employee passwords")
     }
-    
+
     // Business logic...
     if err := changePassword(employeeID, newPassword); err != nil {
         return sdk.HandleErrorAndReturn(err, "Failed to change employee password")
     }
-    
+
     return map[string]interface{}{
         "success": true,
         "message": "Password changed successfully",
