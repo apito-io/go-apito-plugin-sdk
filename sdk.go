@@ -46,11 +46,11 @@ type GraphQLErrorLocation struct {
 
 // GraphQLErrorExtensions represents common GraphQL error extensions
 type GraphQLErrorExtensions struct {
-	Code        string `json:"code"`
-	Exception   string `json:"exception,omitempty"`
-	Timestamp   string `json:"timestamp,omitempty"`
-	PluginName  string `json:"pluginName,omitempty"`
-	RequestID   string `json:"requestId,omitempty"`
+	Code       string `json:"code"`
+	Exception  string `json:"exception,omitempty"`
+	Timestamp  string `json:"timestamp,omitempty"`
+	PluginName string `json:"pluginName,omitempty"`
+	RequestID  string `json:"requestId,omitempty"`
 }
 
 func (e *CodedError) Error() string {
@@ -932,16 +932,42 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 			if IsGraphQLError(err) {
 				// Return GraphQL error as structured data
 				gqlErr := GetGraphQLError(err)
+				
+				// Create the error object with safe serialization
+				errorObj := map[string]interface{}{
+					"message": gqlErr.Message,
+				}
+				
+				// Add extensions if they exist
+				if gqlErr.Extensions != nil && len(gqlErr.Extensions) > 0 {
+					errorObj["extensions"] = gqlErr.Extensions
+				}
+				
+				// Add path if it exists and is not empty
+				if gqlErr.Path != nil && len(gqlErr.Path) > 0 {
+					// Convert path to string array for safe serialization
+					pathStrings := make([]string, len(gqlErr.Path))
+					for i, p := range gqlErr.Path {
+						pathStrings[i] = fmt.Sprintf("%v", p)
+					}
+					errorObj["path"] = pathStrings
+				}
+				
+				// Add locations if they exist and are not empty
+				if gqlErr.Locations != nil && len(gqlErr.Locations) > 0 {
+					locations := make([]map[string]interface{}, len(gqlErr.Locations))
+					for i, loc := range gqlErr.Locations {
+						locations[i] = map[string]interface{}{
+							"line":   loc.Line,
+							"column": loc.Column,
+						}
+					}
+					errorObj["locations"] = locations
+				}
+				
 				errorResult := map[string]interface{}{
-					"errors": []map[string]interface{}{
-						{
-							"message":    gqlErr.Message,
-							"extensions": gqlErr.Extensions,
-							"path":       gqlErr.Path,
-							"locations":  gqlErr.Locations,
-						},
-					},
-					"data": nil,
+					"errors": []map[string]interface{}{errorObj},
+					"data":   nil,
 				}
 
 				resultStruct, err := structpb.NewStruct(errorResult)
@@ -967,18 +993,13 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 				}, nil
 			} else {
 				// Convert regular errors to GraphQL errors for GraphQL operations
-				gqlErr := &GraphQLError{
-					Message: err.Error(),
-					Extensions: map[string]interface{}{
-						"code": "INTERNAL_ERROR",
-					},
-				}
-
 				errorResult := map[string]interface{}{
 					"errors": []map[string]interface{}{
 						{
-							"message":    gqlErr.Message,
-							"extensions": gqlErr.Extensions,
+							"message": err.Error(),
+							"extensions": map[string]interface{}{
+								"code": "INTERNAL_ERROR",
+							},
 						},
 					},
 					"data": nil,

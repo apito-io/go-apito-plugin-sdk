@@ -585,27 +585,27 @@ For GraphQL operations, use the specialized error functions that return properly
 func createUserResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("createUser", rawArgs)
     input := sdk.GetObjectArg(args, "input")
-    
+
     // Validation errors
     if email := sdk.GetStringArg(input, "email"); email == "" {
         return sdk.ReturnValidationError("Email is required", "email")
     }
-    
+
     // Authentication errors
     if userID := sdk.GetUserID(rawArgs); userID == "" {
         return sdk.ReturnAuthenticationError("You must be logged in")
     }
-    
-    // Authorization errors  
+
+    // Authorization errors
     if !hasPermission(userID, "create_user") {
         return sdk.ReturnAuthorizationError("You don't have permission to create users")
     }
-    
+
     // Business logic errors
     if err := createUser(input); err != nil {
         return sdk.HandleErrorAndReturn(err, "Failed to create user")
     }
-    
+
     return result, nil
 }
 ```
@@ -614,7 +614,7 @@ func createUserResolver(ctx context.Context, rawArgs map[string]interface{}) (in
 
 - `ReturnValidationError(message, field)` - For input validation errors
 - `ReturnAuthenticationError(message)` - For authentication required errors
-- `ReturnAuthorizationError(message)` - For permission denied errors  
+- `ReturnAuthorizationError(message)` - For permission denied errors
 - `ReturnNotFoundError(message)` - For resource not found errors
 - `ReturnInternalError(message)` - For internal server errors
 - `ReturnBadUserInputError(message, field)` - For malformed user input
@@ -629,7 +629,7 @@ func restHandler(ctx context.Context, args map[string]interface{}) (interface{},
     if someCondition {
         return nil, sdk.BadRequestError("Invalid request data")
     }
-    
+
     result := processData(args)
     return result, nil
 }

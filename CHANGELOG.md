@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.22] - 2025-01-03
+
+### Fixed
+
+- **GraphQL Error Serialization**: Fixed "proto: invalid type: []map[string]interface {}" error when serializing GraphQL errors
+- **Protobuf Compatibility**: Ensured all GraphQL error fields are protobuf-compatible
+  - Convert `Path` field from `[]interface{}` to `[]string` for safe serialization
+  - Convert `Locations` field from `[]GraphQLErrorLocation` to `[]map[string]interface{}` 
+  - Only include `extensions`, `path`, and `locations` fields if they exist and are not empty
+- **Error Response Stability**: GraphQL error responses now serialize correctly without protobuf failures
+
+### Technical Details
+
+This fixes the serialization issue where complex slice types in GraphQL errors couldn't be converted to protobuf format. The fix ensures backward compatibility while providing proper error serialization for the GraphQL specification.
+
 ## [0.1.21] - 2025-01-03
 
 ### Added

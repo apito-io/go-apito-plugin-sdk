@@ -34,17 +34,17 @@ import (
 func main() {
     // Initialize plugin
     plugin := sdk.Init("plugin-name", "1.0.0", "your-api-key")
-    
+
     // Register your GraphQL operations
-    plugin.RegisterMutation("exampleMutation", 
+    plugin.RegisterMutation("exampleMutation",
         sdk.ComplexObjectFieldWithArgs("Example mutation", responseType, inputArgs),
         exampleMutationResolver)
-    
+
     // Register REST endpoints (optional)
     plugin.RegisterRESTAPI(
         sdk.POSTEndpoint("/api/example", "Example endpoint").Build(),
         exampleRESTHandler)
-    
+
     // Start the plugin server
     plugin.Serve()
 }
@@ -54,9 +54,9 @@ func exampleMutationResolver(ctx context.Context, rawArgs map[string]interface{}
     userID := sdk.GetUserID(rawArgs)
     tenantID := sdk.GetTenantID(rawArgs)
     args := sdk.ParseArgsForResolver("exampleMutation", rawArgs)
-    
+
     // Business logic...
-    
+
     return map[string]interface{}{
         "success": true,
         "message": "Operation completed successfully",
@@ -137,13 +137,13 @@ plugin.RegisterQuery("getExample",
 func getExampleResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("getExample", rawArgs)
     id := sdk.GetStringArg(args, "id")
-    
+
     if id == "" {
         return sdk.ReturnValidationError("ID is required", "id")
     }
-    
+
     // Fetch data...
-    
+
     return result, nil
 }
 ```
@@ -219,8 +219,8 @@ if err := someOperation(); err != nil {
 ```go
 // Validate conditions
 return sdk.ValidateAndReturn(
-    user.HasPermission("admin"), 
-    "Admin permission required", 
+    user.HasPermission("admin"),
+    "Admin permission required",
     successResult,
     "PERMISSION_DENIED")
 
@@ -243,7 +243,7 @@ GraphQL errors are automatically formatted according to the GraphQL specificatio
         "field": "email"
       },
       "path": ["createUser"],
-      "locations": [{"line": 2, "column": 3}]
+      "locations": [{ "line": 2, "column": 3 }]
     }
   ]
 }
@@ -283,17 +283,17 @@ plugin.RegisterRESTAPI(uploadEndpoint, uploadFileHandler)
 func listExamplesRESTHandler(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     // Parse REST arguments
     parsed := sdk.ParseRESTArgs(rawArgs)
-    
+
     // Extract query parameters
     limit := sdk.GetQueryParamInt(rawArgs, "limit", 10)
     offset := sdk.GetQueryParamInt(rawArgs, "offset", 0)
     filter := sdk.GetQueryParam(rawArgs, "filter", "")
-    
+
     // Extract path parameters
     id := sdk.GetPathParam(rawArgs, "id")
-    
+
     // Business logic...
-    
+
     return map[string]interface{}{
         "data": results,
         "pagination": map[string]interface{}{
@@ -312,13 +312,13 @@ func uploadFileHandler(ctx context.Context, rawArgs map[string]interface{}) (int
     // Get file upload
     fileBytes := sdk.GetFileUploadBytes(rawArgs, "file")
     filename, contentType, size := sdk.GetFileUploadInfo(rawArgs, "file")
-    
+
     // Get form data
     description := sdk.GetMultipartFormValue(rawArgs, "description")
     category := sdk.GetMultipartFormValue(rawArgs, "category")
-    
+
     // Process file...
-    
+
     return map[string]interface{}{
         "fileId":   fileId,
         "filename": filename,
@@ -430,24 +430,24 @@ log.Printf("HTTP Method: %s, Path: %s", endpointInfo["method"], endpointInfo["pa
 func createUserResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("createUser", rawArgs)
     input := sdk.GetObjectArg(args, "input")
-    
+
     // Validate input
     email := sdk.GetStringArg(input, "email")
     if email == "" {
         return sdk.ReturnValidationError("Email is required", "email")
     }
-    
+
     // Check authentication
     userID := sdk.GetUserID(rawArgs)
     if userID == "" {
         return sdk.ReturnAuthenticationError("Authentication required")
     }
-    
+
     // Business logic with error conversion
     if err := createUser(email); err != nil {
         return sdk.HandleErrorAndReturn(err, "Failed to create user")
     }
-    
+
     return result, nil
 }
 ```
@@ -459,19 +459,19 @@ func createUserResolver(ctx context.Context, rawArgs map[string]interface{}) (in
 func validateUserInput(input map[string]interface{}) error {
     email := sdk.GetStringArg(input, "email")
     password := sdk.GetStringArg(input, "password")
-    
+
     if email == "" {
         return sdk.GraphQLValidationError("Email is required", "email")
     }
-    
+
     if !isValidEmail(email) {
         return sdk.GraphQLValidationError("Invalid email format", "email")
     }
-    
+
     if len(password) < 8 {
         return sdk.GraphQLValidationError("Password must be at least 8 characters", "password")
     }
-    
+
     return nil
 }
 ```
@@ -482,16 +482,16 @@ func validateUserInput(input map[string]interface{}) error {
 // Proper resource cleanup
 func processFileResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     fileBytes := sdk.GetFileUploadBytes(rawArgs, "file")
-    
+
     // Create temporary file
     tempFile, err := createTempFile(fileBytes)
     if err != nil {
         return sdk.ReturnInternalError("Failed to create temporary file")
     }
     defer os.Remove(tempFile.Name()) // Cleanup
-    
+
     // Process file...
-    
+
     return result, nil
 }
 ```
@@ -502,21 +502,21 @@ func processFileResolver(ctx context.Context, rawArgs map[string]interface{}) (i
 // Standard pagination pattern
 func listItemsResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("listItems", rawArgs)
-    
+
     limit := sdk.GetIntArg(args, "limit", 20)
     offset := sdk.GetIntArg(args, "offset", 0)
-    
+
     // Validate limits
     if limit > 100 {
         return sdk.ReturnValidationError("Limit cannot exceed 100", "limit")
     }
-    
+
     // Fetch data with pagination
     items, total, err := fetchItems(limit, offset)
     if err != nil {
         return sdk.HandleErrorAndReturn(err, "Failed to fetch items")
     }
-    
+
     return map[string]interface{}{
         "items": items,
         "pagination": map[string]interface{}{
@@ -554,15 +554,15 @@ func TestCreateUserResolver(t *testing.T) {
         "context_user_id":   "user123",
         "context_tenant_id": "tenant123",
     }
-    
+
     // Call resolver
     result, err := createUserResolver(context.Background(), rawArgs)
-    
+
     // Assertions
     if err != nil {
         t.Fatalf("Expected no error, got %v", err)
     }
-    
+
     response := result.(map[string]interface{})
     if response["success"] != true {
         t.Errorf("Expected success to be true")
@@ -575,14 +575,14 @@ func TestCreateUserValidation(t *testing.T) {
         "input": map[string]interface{}{},
         "context_user_id": "user123",
     }
-    
+
     _, err := createUserResolver(context.Background(), rawArgs)
-    
+
     // Should return validation error
     if !sdk.IsGraphQLError(err) {
         t.Errorf("Expected GraphQL error, got %v", err)
     }
-    
+
     gqlErr := sdk.GetGraphQLError(err)
     if gqlErr.Extensions["code"] != "VALIDATION_ERROR" {
         t.Errorf("Expected validation error code")
@@ -596,21 +596,21 @@ func TestCreateUserValidation(t *testing.T) {
 func TestPluginIntegration(t *testing.T) {
     // Initialize plugin
     plugin := sdk.Init("test-plugin", "1.0.0", "test-key")
-    
+
     // Register test operations
     plugin.RegisterMutation("testMutation", testField, testResolver)
-    
+
     // Test schema registration
     if _, exists := plugin.GetMutationField("testMutation"); !exists {
         t.Error("Mutation not registered")
     }
-    
+
     // Test health check
     healthResult, err := plugin.performHealthCheck(context.Background())
     if err != nil {
         t.Fatalf("Health check failed: %v", err)
     }
-    
+
     if healthResult["status"] != "healthy" {
         t.Error("Plugin not healthy")
     }
@@ -752,18 +752,18 @@ var cache = make(map[string]interface{})
 func cachedResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("cachedOperation", rawArgs)
     key := generateCacheKey(args)
-    
+
     // Check cache
     if cached, exists := cache[key]; exists {
         return cached, nil
     }
-    
+
     // Fetch data
     result, err := fetchExpensiveData(args)
     if err != nil {
         return sdk.HandleErrorAndReturn(err, "Failed to fetch data")
     }
-    
+
     // Cache result
     cache[key] = result
     return result, nil
@@ -776,14 +776,14 @@ func cachedResolver(ctx context.Context, rawArgs map[string]interface{}) (interf
 func batchCreateResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
     args := sdk.ParseArgsForResolver("batchCreate", rawArgs)
     items := sdk.GetArrayObjectArg(args, "items")
-    
+
     if len(items) > 100 {
         return sdk.ReturnValidationError("Cannot process more than 100 items at once", "items")
     }
-    
+
     results := make([]interface{}, 0, len(items))
     errors := make([]interface{}, 0)
-    
+
     for i, item := range items {
         result, err := createSingleItem(item)
         if err != nil {
@@ -795,7 +795,7 @@ func batchCreateResolver(ctx context.Context, rawArgs map[string]interface{}) (i
         }
         results = append(results, result)
     }
-    
+
     return map[string]interface{}{
         "results":    results,
         "errors":     errors,
