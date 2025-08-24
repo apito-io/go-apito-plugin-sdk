@@ -2,6 +2,24 @@
 
 A simplified SDK for building HashiCorp plugins for the Apito Engine. This SDK abstracts away all the boilerplate code and provides a clean, easy-to-use interface for plugin developers.
 
+## 📚 Documentation
+
+- **[Plugin Development Guide](PLUGIN_DEVELOPMENT_GUIDE.md)** - Comprehensive guide for plugin development and extension
+- **[Complex Types Examples](COMPLEX_TYPES_EXAMPLES.md)** - Examples for complex object types
+- **[Type System Documentation](TYPE_SYSTEM.md)** - Detailed type system documentation
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
+
+## ✨ Features
+
+- **GraphQL Support**: Complete GraphQL schema building and resolver system
+- **REST API Support**: Full REST endpoint registration and handling
+- **Advanced Error Handling**: Comprehensive GraphQL error handling with proper error types
+- **Complex Data Types**: Support for nested objects, arrays, and JSON fields
+- **File Upload Support**: Built-in multipart form and file upload handling
+- **Context Management**: Automatic context data extraction and management
+- **Health Checks**: Built-in health monitoring and diagnostics
+- **Type Safety**: Strong typing with validation and parsing utilities
+
 ## Installation
 
 ```bash
@@ -557,14 +575,61 @@ plugin.RegisterRESTAPI(endpoint, createUserWithMetadataHandler)
 
 ## Error Handling
 
-All resolver functions, REST handlers, and custom functions should return an error as the second return value:
+The SDK provides comprehensive error handling for both GraphQL and REST operations.
+
+### GraphQL Error Handling
+
+For GraphQL operations, use the specialized error functions that return properly formatted GraphQL errors:
 
 ```go
-func myResolver(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-    if someCondition {
-        return nil, fmt.Errorf("validation failed: %s", reason)
+func createUserResolver(ctx context.Context, rawArgs map[string]interface{}) (interface{}, error) {
+    args := sdk.ParseArgsForResolver("createUser", rawArgs)
+    input := sdk.GetObjectArg(args, "input")
+    
+    // Validation errors
+    if email := sdk.GetStringArg(input, "email"); email == "" {
+        return sdk.ReturnValidationError("Email is required", "email")
     }
+    
+    // Authentication errors
+    if userID := sdk.GetUserID(rawArgs); userID == "" {
+        return sdk.ReturnAuthenticationError("You must be logged in")
+    }
+    
+    // Authorization errors  
+    if !hasPermission(userID, "create_user") {
+        return sdk.ReturnAuthorizationError("You don't have permission to create users")
+    }
+    
+    // Business logic errors
+    if err := createUser(input); err != nil {
+        return sdk.HandleErrorAndReturn(err, "Failed to create user")
+    }
+    
+    return result, nil
+}
+```
 
+### Available Error Types
+
+- `ReturnValidationError(message, field)` - For input validation errors
+- `ReturnAuthenticationError(message)` - For authentication required errors
+- `ReturnAuthorizationError(message)` - For permission denied errors  
+- `ReturnNotFoundError(message)` - For resource not found errors
+- `ReturnInternalError(message)` - For internal server errors
+- `ReturnBadUserInputError(message, field)` - For malformed user input
+- `HandleErrorAndReturn(err, message)` - Converts any error to GraphQL format
+
+### REST API Error Handling
+
+For REST endpoints, continue using standard Go errors or HTTP status codes:
+
+```go
+func restHandler(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+    if someCondition {
+        return nil, sdk.BadRequestError("Invalid request data")
+    }
+    
     result := processData(args)
     return result, nil
 }
