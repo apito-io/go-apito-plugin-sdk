@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apito-io/go-apito-plugin-sdk"
+	sdk "github.com/apito-io/go-apito-plugin-sdk"
 )
 
 func main() {

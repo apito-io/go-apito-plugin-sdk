@@ -1,4 +1,4 @@
-package main
+package sdk
 
 import (
 	"context"
@@ -336,14 +336,14 @@ func (b *ObjectTypeBuilder) AddObjectListField(name, description string, objectT
 // AddJSONField adds a JSON field that stores complex data as string but presents as structured GraphQL type
 func (b *ObjectTypeBuilder) AddJSONField(name, description string, structuredType interface{}, nullable bool) *ObjectTypeBuilder {
 	var fieldType string
-	
+
 	// Handle different types of structured data
 	switch v := structuredType.(type) {
 	case ObjectTypeDefinition:
 		// Single object - present as the object type in GraphQL
 		fieldType = fmt.Sprintf("JSON_%s", v.TypeName)
 	case string:
-		// Array type like "User" -> present as [User] in GraphQL  
+		// Array type like "User" -> present as [User] in GraphQL
 		if nullable {
 			fieldType = fmt.Sprintf("JSON_Array_%s", v)
 		} else {
@@ -353,12 +353,12 @@ func (b *ObjectTypeBuilder) AddJSONField(name, description string, structuredTyp
 		// Generic JSON field
 		fieldType = "JSON_Generic"
 	}
-	
+
 	b.def.Fields[name] = ObjectFieldDef{
-		Type:        fieldType,
-		Description: description,
-		Nullable:    nullable,
-		List:        false,
+		Type:          fieldType,
+		Description:   description,
+		Nullable:      nullable,
+		List:          false,
 		ListOfNonNull: false,
 	}
 	return b
@@ -370,12 +370,12 @@ func (b *ObjectTypeBuilder) AddJSONArrayField(name, description string, itemType
 	if !nullable {
 		fieldType += "!"
 	}
-	
+
 	b.def.Fields[name] = ObjectFieldDef{
-		Type:        fieldType,
-		Description: description,
-		Nullable:    nullable,
-		List:        true,
+		Type:          fieldType,
+		Description:   description,
+		Nullable:      nullable,
+		List:          true,
 		ListOfNonNull: false,
 	}
 	return b
@@ -1756,17 +1756,17 @@ func HandleErrorAndReturn(err error, defaultMessage string) (interface{}, error)
 	if err == nil {
 		return nil, GraphQLInternalError("Unexpected nil error")
 	}
-	
+
 	// If it's already a GraphQL error, return it as-is
 	if IsGraphQLError(err) {
 		return nil, err
 	}
-	
+
 	// If it's a coded error, convert it to GraphQL error
 	if IsCodedError(err) {
 		codedErr := err.(*CodedError)
 		extensions := map[string]interface{}{
-			"code": "HTTP_ERROR",
+			"code":           "HTTP_ERROR",
 			"httpStatusCode": codedErr.Code,
 		}
 		if codedErr.Details != "" {
@@ -1774,7 +1774,7 @@ func HandleErrorAndReturn(err error, defaultMessage string) (interface{}, error)
 		}
 		return nil, GraphQLErrorWithExtensions(codedErr.Message, extensions)
 	}
-	
+
 	// For any other error, wrap it as an internal error
 	return nil, GraphQLInternalError(fmt.Sprintf("%s: %v", defaultMessage, err))
 }
