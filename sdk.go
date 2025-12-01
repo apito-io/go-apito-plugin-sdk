@@ -1,4 +1,4 @@
-package sdk
+package main
 
 import (
 	"context"
@@ -976,8 +976,8 @@ func (impl *pluginImpl) Execute(ctx context.Context, req *protobuff.ExecuteReque
 				}
 
 				errorResult := map[string]interface{}{
-					"graphql_errors": string(errorsJSON), // Send as JSON string
-					"data":           nil,
+					"graphql_errors":   string(errorsJSON), // Send as JSON string
+					"data":             nil,
 					"is_graphql_error": true, // Flag to indicate this is a GraphQL error
 				}
 
