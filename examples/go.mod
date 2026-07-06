@@ -2,7 +2,7 @@ module example-plugin
 
 go 1.25.4
 
-require github.com/apito-io/go-apito-plugin-sdk v0.2.0
+require github.com/apito-io/go-apito-plugin-sdk v0.2.1
 
 replace github.com/apito-io/go-apito-plugin-sdk => ../
 
