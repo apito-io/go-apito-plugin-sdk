@@ -1,5 +1,7 @@
 ---
-alwaysApply: true
+description: Knowledge entry point for go-plugin-build-sdk — read .knowledge/README.md before coding in apito/sdk/go-plugin-build-sdk
+globs: apito/sdk/go-plugin-build-sdk/**
+alwaysApply: false
 ---
 
 # Knowledge base — go-plugin-build-sdk
