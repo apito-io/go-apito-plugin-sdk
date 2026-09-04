@@ -15,6 +15,7 @@ This comprehensive guide covers everything you need to know about developing and
 9. [Testing](#testing)
 10. [Deployment](#deployment)
 11. [Extension Guidelines](#extension-guidelines)
+12. [Contribution manifest](#contribution-manifest)
 
 ## Getting Started
 
@@ -806,3 +807,44 @@ func batchCreateResolver(ctx context.Context, rawArgs map[string]interface{}) (i
 ```
 
 This guide provides comprehensive coverage of plugin development for the Apito platform. Use it as a reference for creating new plugins or extending existing ones. Always refer to the latest SDK documentation for any updates or new features.
+
+## Contribution manifest
+
+Declare optional `contributions` in `config.yml`. Absence of a section means that surface does not exist. Engine overlays live `SchemaRegister` / `RESTApiRegister` names onto `api`. Console UI must consume host React 19 and Ant Design 6 via `window.ApitoPluginSDK` — do not bundle another React. Plugin fields store a core `storage_type` plus `plugin_id` / `plugin_field_type`; do not add values to `FIELD_TYPE_ENUM`.
+
+```yaml
+plugin:
+  id: hc-cloudinary-plugin
+  capabilities:
+    - project.graphql
+    - project.rest
+    - console.routes
+    - console.settings
+    - content.fields
+  contributions:
+    api:
+      scope: project
+      queries:
+        - name: cloudinaryAssets
+      mutations:
+        - name: cloudinarySignUpload
+      rest:
+        - method: GET
+          path: /assets
+    ui:
+      ui_available: true
+      navigation:
+        - after: storage
+          label: Cloudinary
+      settings:
+        - path: /console/settings/plugins/hc-cloudinary-plugin
+          label: Cloudinary
+    fields:
+      - id: cloudinary_asset
+        label: Cloudinary Asset
+        storage_type: media
+        form_component: CloudinaryAssetPicker
+        display_component: CloudinaryAssetPreview
+        content_form: true
+```
+

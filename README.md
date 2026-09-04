@@ -2,6 +2,8 @@
 
 A simplified SDK for building HashiCorp plugins for the Apito Engine. This SDK abstracts away all the boilerplate code and provides a clean, easy-to-use interface for plugin developers.
 
+Install once on the engine as a **system plugin**. Declare `capabilities` in `config.yml` (not `type: project`). Activate per project from Console Project Settings → Plugins. See https://apito.io/docs/platform/plugins/
+
 ## 📚 Documentation
 
 - **[Plugin Development Guide](PLUGIN_DEVELOPMENT_GUIDE.md)** - Comprehensive guide for plugin development and extension
