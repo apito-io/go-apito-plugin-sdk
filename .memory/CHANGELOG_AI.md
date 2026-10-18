@@ -4,6 +4,12 @@ Not git history — the *reasoning* behind changes. Newest on top.
 Format per entry: date, **Changed**, **Why**, **Affected**.
 
 ---
+## 2026-10-18 — Go plugin SDK license
+
+- **Changed:** README opening and a full Apache-2.0 LICENSE.
+- **Why:** The public plugin SDK had no license file.
+- **Affected:** `README.md`, `LICENSE`. No tag.
+
 ## 2026-09-03 — README install vs activate
 
 - **Changed:** README points at system install + capabilities + project

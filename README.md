@@ -1,6 +1,8 @@
-# Apito Plugin SDK
+# Apito Go Plugin SDK
 
-A simplified SDK for building HashiCorp plugins for the Apito Engine. This SDK abstracts away all the boilerplate code and provides a clean, easy-to-use interface for plugin developers.
+Write Apito engine plugins in Go.
+
+This SDK builds HashiCorp plugins for the Apito Engine.
 
 Install once on the engine as a **system plugin**. Declare `capabilities` in `config.yml` (not `type: project`). Activate per project from Console Project Settings → Plugins. See https://apito.io/docs/platform/plugins/
 
